@@ -560,6 +560,12 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
 	hdr = module_alloc(size);
 	if (!hdr) {
 		bpf_jit_uncharge_modmem(pages);
+#ifdef CONFIG_MODULES
+	hdr = module_alloc(size);
+#else
+	hdr = vmalloc_exec(size);
+#endif
+	if (hdr == NULL)
 		return NULL;
 	}
 
@@ -584,6 +590,11 @@ void bpf_jit_binary_free(struct bpf_binary_header *hdr)
 
 	module_memfree(hdr);
 	bpf_jit_uncharge_modmem(pages);
+#ifdef CONFIG_MODULES
+	module_memfree(hdr);
+#else
+	vfree(hdr);
+#endif
 }
 
 /* This symbol is only overridden by archs that have different
