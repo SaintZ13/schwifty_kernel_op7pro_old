@@ -553,13 +553,12 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
 	 * random section of illegal instructions.
 	 */
 	size = round_up(proglen + sizeof(*hdr) + 128, PAGE_SIZE);
-	pages = size / PAGE_SIZE;
-
-	if (bpf_jit_charge_modmem(pages))
-		return NULL;
+#ifdef CONFIG_MODULES
 	hdr = module_alloc(size);
-	if (!hdr) {
-		bpf_jit_uncharge_modmem(pages);
+#else
+	hdr = vmalloc_exec(size);
+#endif
+	if (hdr == NULL)
 		return NULL;
 	}
 
@@ -580,10 +579,11 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
 
 void bpf_jit_binary_free(struct bpf_binary_header *hdr)
 {
-	u32 pages = hdr->pages;
-
+#ifdef CONFIG_MODULES
 	module_memfree(hdr);
-	bpf_jit_uncharge_modmem(pages);
+#else
+	vfree(hdr);
+#endif
 }
 
 /* This symbol is only overridden by archs that have different
