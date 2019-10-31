@@ -125,3 +125,20 @@ all.config
 
 # fetched Android config fragments
 kernel/configs/android-*.cfg
+build/Changelog\.txt
+out
+build/Image/.gz-dtb
+
+upload/
+# Leave out building folders
+build/
+out/
+prebuilts/
+build.sh
+rc.sh
+rv.sh
+run.sh
+changelog
+build_schwifty.sh
+changelog
+/out
