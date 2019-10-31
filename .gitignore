@@ -130,3 +130,12 @@ kernel/configs/android-*.cfg
 #Ignoring Android.bp link file
 #
 Android.bp
+build/Changelog\.txt
+build/Image/.gz-dtb
+
+# Leave out building folders
+build/
+out/
+out
+build_schwifty.sh
+changelog
