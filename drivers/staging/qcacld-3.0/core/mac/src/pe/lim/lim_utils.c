@@ -1286,13 +1286,17 @@ lim_update_short_preamble(struct mac_context *mac_ctx, tSirMacAddr peer_mac_addr
 		tLimNoShortParams *lim_params =
 				&psession_entry->gLimNoShortParams;
 		if (LIM_IS_AP_ROLE(psession_entry)) {
+#ifdef WLAN_DEBUG
 			pe_err("No space in Short cache active: %d sta: %d for sta",
 				i, lim_params->numNonShortPreambleSta);
+#endif
 			lim_print_mac_addr(mac_ctx, peer_mac_addr, LOGE);
 			return;
 		} else {
+#ifdef WLAN_DEBUG
 			pe_err("No space in Short cache active: %d sta: %d for sta",
 				i, lim_params->numNonShortPreambleSta);
+#endif
 			lim_print_mac_addr(mac_ctx, peer_mac_addr, LOGE);
 			return;
 		}
