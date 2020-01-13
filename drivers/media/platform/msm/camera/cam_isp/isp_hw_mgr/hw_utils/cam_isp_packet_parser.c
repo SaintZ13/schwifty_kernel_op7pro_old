@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -70,6 +70,8 @@ int cam_isp_add_change_base(
 			hw_entry[num_ent].handle = kmd_buf_info->handle;
 			hw_entry[num_ent].len    = get_base.cmd.used_bytes;
 			hw_entry[num_ent].offset = kmd_buf_info->offset;
+			/* Marking change base as IOCFG to reapply on bubble */
+			hw_entry[num_ent].flags  = CAM_ISP_IOCFG_BL;
 			CAM_DBG(CAM_ISP,
 				"num_ent=%d handle=0x%x, len=%u, offset=%u",
 				num_ent,
@@ -301,10 +303,7 @@ int cam_isp_add_command_buffers(
 					hw_entry[num_ent].handle,
 					hw_entry[num_ent].len,
 					hw_entry[num_ent].offset);
-
-				if (cmd_meta_data ==
-					CAM_ISP_PACKET_META_DMI_LEFT)
-					hw_entry[num_ent].flags = 0x1;
+				hw_entry[num_ent].flags = CAM_ISP_IQ_BL;
 
 				num_ent++;
 			}
@@ -323,9 +322,7 @@ int cam_isp_add_command_buffers(
 					hw_entry[num_ent].len,
 					hw_entry[num_ent].offset);
 
-				if (cmd_meta_data ==
-					CAM_ISP_PACKET_META_DMI_RIGHT)
-					hw_entry[num_ent].flags = 0x1;
+				hw_entry[num_ent].flags = CAM_ISP_IQ_BL;
 				num_ent++;
 			}
 			break;
@@ -341,8 +338,7 @@ int cam_isp_add_command_buffers(
 				hw_entry[num_ent].handle,
 				hw_entry[num_ent].len,
 				hw_entry[num_ent].offset);
-			if (cmd_meta_data == CAM_ISP_PACKET_META_DMI_COMMON)
-				hw_entry[num_ent].flags = 0x1;
+			hw_entry[num_ent].flags = CAM_ISP_IQ_BL;
 
 			num_ent++;
 			break;
@@ -373,6 +369,7 @@ int cam_isp_add_command_buffers(
 						rc);
 					return rc;
 				}
+				hw_entry[num_ent].flags = CAM_ISP_IQ_BL;
 				num_ent = prepare->num_hw_update_entries;
 			}
 			break;
@@ -395,6 +392,7 @@ int cam_isp_add_command_buffers(
 						rc);
 					return rc;
 				}
+				hw_entry[num_ent].flags = CAM_ISP_IQ_BL;
 				num_ent = prepare->num_hw_update_entries;
 			}
 			break;
@@ -415,6 +413,7 @@ int cam_isp_add_command_buffers(
 					"Failed in processing blobs %d", rc);
 				return rc;
 			}
+			hw_entry[num_ent].flags = CAM_ISP_IQ_BL;
 			num_ent = prepare->num_hw_update_entries;
 		}
 			break;
@@ -438,7 +437,9 @@ int cam_isp_add_io_buffers(
 	struct cam_ife_hw_mgr_res            *res_list_isp_out,
 	struct list_head                     *res_list_ife_in_rd,
 	uint32_t                              size_isp_out,
-	bool                                  fill_fence)
+	bool                                  fill_fence,
+	unsigned long                         *res_bitmap,
+	cam_fill_res_bitmap                   fill_res_bitmap)
 {
 	int rc = 0;
 	uint64_t                            io_addr[CAM_PACKET_MAX_PLANES];
@@ -783,6 +784,8 @@ int cam_isp_add_io_buffers(
 			}
 			io_cfg_used_bytes += update_buf.cmd.used_bytes;
 		}
+
+		fill_res_bitmap(io_cfg[i].resource_type, res_bitmap);
 	}
 
 	CAM_DBG(CAM_ISP, "io_cfg_used_bytes %d, fill_fence %d",
@@ -795,6 +798,8 @@ int cam_isp_add_io_buffers(
 		prepare->hw_update_entries[num_ent].len = io_cfg_used_bytes;
 		prepare->hw_update_entries[num_ent].offset =
 			kmd_buf_info->offset;
+		prepare->hw_update_entries[num_ent].flags = CAM_ISP_IOCFG_BL;
+
 		CAM_DBG(CAM_ISP,
 			"num_ent=%d handle=0x%x, len=%u, offset=%u",
 			num_ent,
@@ -821,13 +826,16 @@ int cam_isp_add_reg_update(
 	struct cam_hw_prepare_update_args    *prepare,
 	struct list_head                     *res_list_isp_src,
 	uint32_t                              base_idx,
-	struct cam_kmd_buf_info              *kmd_buf_info)
+	struct cam_kmd_buf_info              *kmd_buf_info,
+	bool                                  is_fe_en,
+	unsigned long                         res_bitmap)
 {
 	int rc = -EINVAL;
 	struct cam_isp_resource_node         *res;
 	struct cam_ife_hw_mgr_res            *hw_mgr_res;
 	struct cam_hw_update_entry           *hw_entry;
 	struct cam_isp_hw_get_cmd_update      get_regup;
+	struct cam_isp_hw_rup_data            rup_data;
 	uint32_t kmd_buf_remain_size, num_ent, i, reg_update_size;
 
 	hw_entry = prepare->hw_update_entries;
@@ -873,6 +881,9 @@ int cam_isp_add_reg_update(
 			get_regup.cmd.size = kmd_buf_remain_size;
 			get_regup.cmd_type = CAM_ISP_HW_CMD_GET_REG_UPDATE;
 			get_regup.res = res;
+			rup_data.is_fe_enable = is_fe_en;
+			rup_data.res_bitmap = res_bitmap;
+			get_regup.rup_data = &rup_data;
 
 			rc = res->hw_intf->hw_ops.process_cmd(
 				res->hw_intf->hw_priv,
@@ -895,6 +906,9 @@ int cam_isp_add_reg_update(
 		prepare->hw_update_entries[num_ent].len = reg_update_size;
 		prepare->hw_update_entries[num_ent].offset =
 			kmd_buf_info->offset;
+		/* Marking reg update as IOCFG to reapply on bubble */
+		prepare->hw_update_entries[num_ent].flags = CAM_ISP_IOCFG_BL;
+
 		CAM_DBG(CAM_ISP,
 			"num_ent=%d handle=0x%x, len=%u, offset=%u",
 			num_ent,

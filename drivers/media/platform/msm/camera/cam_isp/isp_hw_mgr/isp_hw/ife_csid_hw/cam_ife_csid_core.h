@@ -309,6 +309,10 @@ struct cam_ife_csid_common_reg_offset {
 	uint32_t ppp_irq_mask_all;
 	uint32_t measure_en_hbi_vbi_cnt_mask;
 	uint32_t format_measure_en_val;
+	uint32_t format_measure_width_shift_val;
+	uint32_t format_measure_width_mask_val;
+	uint32_t format_measure_height_shift_val;
+	uint32_t format_measure_height_mask_val;
 };
 
 /**
@@ -419,6 +423,9 @@ struct cam_ife_csid_cid_data {
  * @master_idx:     For Slave reservation, Give master IFE instance Index.
  *                  Slave will synchronize with master Start and stop operations
  * @clk_rate        Clock rate
+ * @usage_type      Usage type ie dual or single ife usecase
+ * @init_frame_drop init frame drop value. In dual ife case rdi need to drop one
+ *                  more frame than pix.
  *
  */
 struct cam_ife_csid_path_cfg {
@@ -437,6 +444,8 @@ struct cam_ife_csid_path_cfg {
 	enum cam_isp_hw_sync_mode       sync_mode;
 	uint32_t                        master_idx;
 	uint64_t                        clk_rate;
+	uint32_t                        usage_type;
+	uint32_t                        init_frame_drop;
 };
 
 /**
@@ -463,11 +472,23 @@ struct cam_ife_csid_path_cfg {
  * @csid_debug:               csid debug information to enable the SOT, EOT,
  *                            SOF, EOF, measure etc in the csid hw
  * @clk_rate                  Clock rate
+ * @ipp_path                  ipp path configuration
+ * @ppp_path                  ppp path configuration
+ * @rdi_path                  RDI path configuration
+ * @hbi                       Horizontal blanking
+ * @vbi                       Vertical blanking
  * @sof_irq_triggered:        Flag is set on receiving event to enable sof irq
  *                            incase of SOF freeze.
  * @irq_debug_cnt:            Counter to track sof irq's when above flag is set.
  * @error_irq_count           Error IRQ count, if continuous error irq comes
  *                            need to stop the CSID and mask interrupts.
+ * @device_enabled            Device enabled will set once CSID powered on and
+ *                            initial configuration are done.
+ * @lock_state                csid spin lock
+ * @dual_usage                usage type, dual ife or single ife
+ * @init_frame_drop           Initial frame drop number
+ * @res_sof_cnt               path resource sof count value. it used for initial
+ *                            frame drop
  *
  */
 struct cam_ife_csid_hw {
@@ -491,11 +512,19 @@ struct cam_ife_csid_hw {
 	struct completion    csid_rdin_complete[CAM_IFE_CSID_RDI_MAX];
 	uint64_t                         csid_debug;
 	uint64_t                         clk_rate;
+	struct cam_isp_sensor_dimension  ipp_path_config;
+	struct cam_isp_sensor_dimension  ppp_path_config;
+	struct cam_isp_sensor_dimension  rdi_path_config[4];
+	uint32_t                         hbi;
+	uint32_t                         vbi;
 	bool                             sof_irq_triggered;
 	uint32_t                         irq_debug_cnt;
 	uint32_t                         error_irq_count;
 	uint32_t                         device_enabled;
 	spinlock_t                       lock_state;
+	uint32_t                         dual_usage;
+	uint32_t                         init_frame_drop;
+	uint32_t                         res_sof_cnt[CAM_IFE_PIX_PATH_RES_MAX];
 };
 
 int cam_ife_csid_hw_probe_init(struct cam_hw_intf  *csid_hw_intf,

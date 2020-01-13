@@ -25,6 +25,7 @@
 #include <linux/extcon.h>
 #include <linux/usb/class-dual-role.h>
 #include "storm-watch.h"
+#include "battery.h"
 
 enum print_reason {
 	PR_INTERRUPT	= BIT(0),
@@ -61,6 +62,7 @@ enum print_reason {
 #define THIRD_PROTECT_RISE_RATE 3
 #define THIRD_PROTECT_LOOP_TEMP 40
 #define THIRD_PROTECT_INTERVAL_TEMP 15
+#define THIRD_PROTECT_BASE_TEMP 20
 #define FV_OFFSET_VOLTAGE 70
 #define SKIN_THERMAL_HIGH 40
 #define SKIN_THERMAL_NORMAL 37
@@ -424,7 +426,6 @@ struct smb_charger {
 	int			*call_on;
 	enum smb_mode		mode;
 	struct smb_chg_freq	chg_freq;
-	int			smb_version;
 	int			otg_delay_ms;
 	int			*weak_chg_icl_ua;
 	bool			pd_not_supported;
@@ -442,6 +443,7 @@ struct smb_charger {
 	struct pinctrl_state *usb_temperature_default;
 	struct pinctrl *pinctrl;
 	struct mutex		irq_status_lock;
+	spinlock_t		typec_pr_lock;
 
 	/* power supplies */
 	struct power_supply		*batt_psy;
@@ -533,11 +535,13 @@ struct smb_charger {
 	struct delayed_work	usbov_dbc_work;
 	struct delayed_work	role_reversal_check;
 	struct delayed_work	pr_swap_detach_work;
+	struct delayed_work	pr_lock_clear_work;
 
 	struct alarm		lpd_recheck_timer;
 	struct alarm		moisture_protection_alarm;
 	struct alarm		chg_termination_alarm;
 
+	struct charger_param	chg_param;
 	/* secondary charger config */
 	bool			sec_pl_present;
 	bool			sec_cp_present;
@@ -549,10 +553,12 @@ struct smb_charger {
 	int			voltage_max_uv;
 	int			pd_active;
 	bool			pd_hard_reset;
+	bool			pr_lock_in_progress;
 	bool			pr_swap_in_progress;
 	bool			early_usb_attach;
 	bool			ok_to_pd;
 	bool			typec_legacy;
+	bool			typec_irq_en;
 
 	/* cached status */
 /* @bsp, 2019/04/17 Battery & Charging porting */
@@ -649,6 +655,7 @@ struct smb_charger {
 	int					third_protect_rise_rate;
 	int					third_protect_loop_temp;
 	int					third_protect_interval_temp;
+	int					third_protect_base_temp;
 	int					skin_thermal_high_threshold;
 	int					skin_thermal_normal_threshold;
 	bool					enable_dash_current_adjust;
@@ -713,6 +720,7 @@ struct smb_charger {
 	int			hw_max_icl_ua;
 	int			auto_recharge_soc;
 	enum sink_src_mode	sink_src_mode;
+	enum power_supply_typec_power_role power_role;
 	enum jeita_cfg_stat	jeita_configured;
 	int			charger_temp_max;
 	int			smb_temp_max;
@@ -751,6 +759,7 @@ struct smb_charger {
 	int			usbin_forced_max_uv;
 	int			init_thermal_ua;
 	u32			comp_clamp_level;
+	bool			hvdcp3_standalone_config;
 
 	/* workaround flag */
 	u32			wa_flags;
@@ -1021,6 +1030,7 @@ void smblib_apsd_enable(struct smb_charger *chg, bool enable);
 int smblib_force_vbus_voltage(struct smb_charger *chg, u8 val);
 int smblib_get_irq_status(struct smb_charger *chg,
 				union power_supply_propval *val);
+int smblib_get_qc3_main_icl_offset(struct smb_charger *chg, int *offset_ua);
 
 int smblib_init(struct smb_charger *chg);
 int smblib_deinit(struct smb_charger *chg);

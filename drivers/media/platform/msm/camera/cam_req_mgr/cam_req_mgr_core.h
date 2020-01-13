@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -234,12 +234,14 @@ struct cam_req_mgr_slot {
  * @slot        : request slot holding incoming request id and bubble info.
  * @rd_idx      : indicates slot index currently in process.
  * @wr_idx      : indicates slot index to hold new upcoming req.
+ * @last_applied_idx : indicates slot index last applied successfully.
  */
 struct cam_req_mgr_req_queue {
 	int32_t                     num_slots;
 	struct cam_req_mgr_slot     slot[MAX_REQ_SLOTS];
 	int32_t                     rd_idx;
 	int32_t                     wr_idx;
+	int32_t                     last_applied_idx;
 };
 
 /**
@@ -315,9 +317,9 @@ struct cam_req_mgr_connected_device {
  *                         is assigned as master
  * @initial_skip         : Flag to determine if slave has started streaming in
  *                         master-slave sync
- * @initial_sync_req     : The initial req which is required to sync
-							with the other link
- *
+ * @in_msync_mode        : Flag to determine if a link is in master-slave mode
+ * @initial_sync_req     : The initial req which is required to sync with the
+ *                         other link
  */
 struct cam_req_mgr_core_link {
 	int32_t                              link_hdl;
@@ -342,6 +344,7 @@ struct cam_req_mgr_core_link {
 	atomic_t                             is_used;
 	bool                                 is_master;
 	bool                                 initial_skip;
+	bool                                 in_msync_mode;
 	int64_t                              initial_sync_req;
 };
 
