@@ -11302,8 +11302,10 @@ static int hdd_update_mac_addr_to_fw(struct hdd_context *hdd_ctx)
 	return 0;
 }
 
-static void reverse_byte_array(uint8_t *arr, int len) {
-	int i;
+static void reverse_byte_array(uint8_t *arr, int len)
+{
+	int i = 0;
+
 	for (i = 0; i < len / 2; i++) {
 		char temp = arr[i];
 		arr[i] = arr[len - i - 1];
