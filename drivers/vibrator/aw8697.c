@@ -791,6 +791,13 @@ static unsigned char aw8697_haptic_set_level(struct aw8697 *aw8697, int gain)
 {
     int val = 80;
 
+#ifdef CONFIG_HAPTIC_FEEDBACK_DISABLE
+    if ((ignore_next_request) && (val != 0)) {
+       ignore_next_request = 0;
+       return 0;
+    }
+#endif
+
     val = aw8697->level * gain / 3;
     if (val > 255)
         val = 255;

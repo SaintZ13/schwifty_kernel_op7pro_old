@@ -28,6 +28,10 @@ config HAPTIC_FEEDBACK_DISABLE
 	bool "Export haptic feedback control in sysfs"
 	default n
 
+config HAPTIC_FEEDBACK_DISABLE
+	bool "Export gestures haptic feedback control"
+	default n
+
 config INPUT_LEDS
 	tristate "Export input device LEDs in sysfs"
 	depends on LEDS_CLASS
