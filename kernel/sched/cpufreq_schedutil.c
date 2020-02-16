@@ -449,21 +449,8 @@ static void sugov_walt_adjust(struct sugov_cpu *sg_cpu, unsigned long *util,
 	if (unlikely(!sysctl_sched_use_walt_cpu_util))
 		return;
 
-	is_hiload = (cpu_util >= mult_frac(sg_policy->avg_cap,
-					   sg_policy->tunables->hispeed_load,
-					   100));
-
-	if (is_hiload && !is_migration)
-		*util = max(*util, sg_policy->hispeed_util);
-
-	if (is_hiload && nl >= mult_frac(cpu_util, NL_RATIO, 100))
-		*util = *max;
-
-	if (sg_policy->tunables->pl) {
-		if (conservative_pl())
-			pl = mult_frac(pl, TARGET_LOAD, 100);
-		*util = max(*util, pl);
-	}
+	if (sg_policy->tunables->pl && sg_cpu->walt_load.pl > *util)
+		*util = (*util + sg_cpu->walt_load.pl) / 2;
 }
 
 static void sugov_update_single(struct update_util_data *hook, u64 time,
