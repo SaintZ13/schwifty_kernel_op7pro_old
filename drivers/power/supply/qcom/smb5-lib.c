@@ -1559,17 +1559,6 @@ int smblib_set_icl_current(struct smb_charger *chg, int icl_ua)
 		pr_info("icl_ua=%d\n", icl_ua);
 	}
 
-	if (chg->connector_type == POWER_SUPPLY_CONNECTOR_TYPEC) {
-		rc = smblib_masked_write(chg, USB_CMD_PULLDOWN_REG,
-				EN_PULLDOWN_USB_IN_BIT,
-				suspend ? 0 : EN_PULLDOWN_USB_IN_BIT);
-		if (rc < 0) {
-			smblib_err(chg, "Couldn't write %s to EN_PULLDOWN_USB_IN_BIT rc=%d\n",
-				suspend ? "disable" : "enable", rc);
-			goto out;
-		}
-	}
-
 	if (suspend)
 		return smblib_set_usb_suspend(chg, true);
 
@@ -6469,6 +6458,7 @@ irqreturn_t typec_attach_detach_irq_handler(int irq, void *data)
 	struct smb_irq_data *irq_data = data;
 	struct smb_charger *chg = irq_data->parent_data;
 	u8 stat;
+	bool attached = false;
 	int rc;
 	int i = 0, dump_offset = 6;
 
@@ -6528,8 +6518,9 @@ irqreturn_t typec_attach_detach_irq_handler(int irq, void *data)
 		return IRQ_HANDLED;
 	}
 
-	if (stat & TYPEC_ATTACH_DETACH_STATE_BIT) {
+	attached = !!(stat & TYPEC_ATTACH_DETACH_STATE_BIT);
 
+	if (attached) {
 		smblib_lpd_clear_ra_open_work(chg);
 
 		rc = smblib_read(chg, TYPE_C_MISC_STATUS_REG, &stat);
@@ -6588,6 +6579,13 @@ irqreturn_t typec_attach_detach_irq_handler(int irq, void *data)
 			schedule_delayed_work(&chg->lpd_detach_work,
 					msecs_to_jiffies(1000));
 	}
+
+	rc = smblib_masked_write(chg, USB_CMD_PULLDOWN_REG,
+			EN_PULLDOWN_USB_IN_BIT,
+			attached ?  0 : EN_PULLDOWN_USB_IN_BIT);
+	if (rc < 0)
+		smblib_err(chg, "Couldn't configure pulldown on USB_IN rc=%d\n",
+				rc);
 
 	power_supply_changed(chg->usb_psy);
 	if (chg->dual_role)
@@ -7107,7 +7105,12 @@ static int op_charging_en(struct smb_charger *chg, bool en)
 {
 	int rc;
 
-	pr_err("enable=%d\n", en);
+	pr_info("enable=%d\n", en);
+	if (chg->chg_disabled && en) {
+		pr_info("chg_disabled just return\n");
+		return 0;
+	}
+
 	rc = smblib_masked_write(chg, CHARGING_ENABLE_CMD_REG,
 				 CHARGING_ENABLE_CMD_BIT,
 				 en ? CHARGING_ENABLE_CMD_BIT : 0);
@@ -7169,6 +7172,8 @@ bool is_fastchg_allowed(struct smb_charger *chg)
 	low_temp_full = op_get_fast_low_temp_full(chg);
 	fw_updated = get_fastchg_firmware_updated_status(chg);
 
+	if (chg->chg_disabled)
+		return false;
 	if (!fw_updated)
 		return false;
 	if (chg->usb_enum_status)
@@ -7257,12 +7262,15 @@ static void op_handle_usb_removal(struct smb_charger *chg)
 	chg->recovery_boost_count = 0;
 	chg->ck_unplug_count = 0;
 	chg->count_run = 0;
+	chg->chg_disabled = 0;
 	vote(chg->fcc_votable,
 		DEFAULT_VOTER, true, SDP_CURRENT_UA);
 #ifdef CONFIG_FORCE_FAST_CHARGE
 	set_sdp_current(chg, USBIN_500MA);
 	chg->ffc_count = 0;
 #endif
+	vote(chg->chg_disable_votable,
+		FORCE_RECHARGE_VOTER, false, 0);
 	op_battery_temp_region_set(chg, BATT_TEMP_INVALID);
 }
 
@@ -7716,7 +7724,10 @@ static void retrigger_dash_work(struct work_struct *work)
 		chg->ck_dash_count = 0;
 		return;
 	}
-
+	if (chg->chg_disabled) {
+		chg->ck_dash_count = 0;
+		return;
+	}
 	if (chg->pd_active) {
 		chg->ck_dash_count = 0;
 		pr_info("pd_active return retrigger_dash\n");
@@ -8742,6 +8753,9 @@ static int msm_drm_notifier_callback(struct notifier_block *self,
 			vote(chip->usb_icl_votable,
 					SW_ICL_MAX_VOTER, true, rp_ua);
 		}
+		/* add to update fg node value on panel event */
+		panel_flag1 = 1;
+		panel_flag2 = 1;
 	}
 
 	return 0;
@@ -9369,6 +9383,10 @@ static void op_heartbeat_work(struct work_struct *work)
 	power_supply_changed(chg->batt_psy);
 	chg->dash_on = get_prop_fast_chg_started(chg);
 	if (chg->dash_on) {
+		if (chg->chg_disabled) {
+			set_usb_switch(chg, false);
+			goto out;
+		}
 		switch_fast_chg(chg);
 		pr_info("fast chg started, usb_switch=%d\n",
 				op_is_usb_switch_on(chg));
