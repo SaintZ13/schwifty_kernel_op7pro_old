@@ -452,7 +452,7 @@ static void tp_gesture_handle(struct touchpanel_data *ts)
         if (haptic_feedback_disable)
                 hap_ignore_next_request();
 #endif
-	}
+
 	} else
 
 	if ((gesture_info_temp.gesture_type == DouTap && DouTap_enable) ||
