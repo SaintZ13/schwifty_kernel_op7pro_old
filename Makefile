@@ -425,8 +425,8 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common -fshort-wchar \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
-		   -Wno-builtin-declaration-mismatch -Wno-restrict \
-		   -std=gnu89
+		   -std=gnu89 \
+		   -mcpu=cortex-a55 -fdiagnostics-color=always -pipe
 KBUILD_CPPFLAGS := -D__KERNEL__
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
