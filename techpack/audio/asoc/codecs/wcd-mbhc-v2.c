@@ -1912,46 +1912,6 @@ static int wcd_mbhc_usbc_ana_event_handler(struct notifier_block *nb,
 	return 0;
 }
 
-static void wcd_mbhc_usbc_ana_detect_work_fn(struct work_struct *work)
-{
-	struct delayed_work *dwork;
-	struct wcd_mbhc *mbhc;
-	struct power_supply *usb_psy;
-	union power_supply_propval mode;
-	int rc = 0;
-
-	dwork = to_delayed_work(work);
-	mbhc = container_of(dwork, struct wcd_mbhc, mbhc_usbc_detect_dwork);
-
-	usb_psy = power_supply_get_by_name("usb");
-	if (!usb_psy) {
-		pr_err("%s: could not get USB psy info\n", __func__);
-		return;
-	}
-
-	rc = power_supply_get_property(usb_psy,
-			POWER_SUPPLY_PROP_TYPEC_MODE, &mode);
-	if (rc) {
-		pr_err("%s: Unable to read USB TYPEC_MODE: %d\n",
-			__func__, rc);
-		goto exit;
-	}
-
-	pr_info("%s: USB supply mode %d\n", __func__, mode.intval);
-
-	if (mode.intval == POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER) {
-		if (mbhc->mbhc_cb->clk_setup)
-			mbhc->mbhc_cb->clk_setup(mbhc->codec, true);
-		/* insertion detected, enable L_DET_EN */
-		WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_L_DET_EN, 1);
-
-		if (mbhc->use_usbc_detect)
-			wcd_mbhc_usbc_analog_plug_detect(mbhc, 1);
-	}
-
-exit:
-	power_supply_put(usb_psy);
-	return;
 static int wcd_mbhc_init_gpio(struct wcd_mbhc *mbhc,
 				struct wcd_mbhc_config *mbhc_cfg,
 				const char *gpio_dt_str,
@@ -2306,8 +2266,6 @@ void wcd_mbhc_stop(struct wcd_mbhc *mbhc)
 	if (mbhc->use_usbc_detect)
 		cancel_delayed_work_sync(&mbhc->mbhc_usbc_detect_dwork);
 
-	if (mbhc->mbhc_cfg->enable_usbc_analog)
-		fsa4480_unreg_notifier(&mbhc->fsa_nb, mbhc->fsa_np);
 	if (mbhc->mbhc_cfg->enable_usbc_analog) {
 		if (mbhc->mbhc_cfg->fsa_enable) {
 			fsa4480_unreg_notifier(&mbhc->fsa_nb, mbhc->fsa_np);
@@ -2588,7 +2546,7 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_codec *codec,
 
 	if (mbhc->use_usbc_detect)
 		INIT_DELAYED_WORK(&mbhc->mbhc_usbc_detect_dwork,
-				wcd_mbhc_usbc_ana_detect_work_fn);
+				wcd_mbhc_usbc_analog_work_fn);
 
 	mbhc->deinit_in_progress = false;
 	pr_debug("%s: leave ret %d\n", __func__, ret);
