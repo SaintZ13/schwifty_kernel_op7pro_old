@@ -1308,6 +1308,26 @@ int wma_unified_beacon_debug_stats_event_handler(void *handle,
 						 uint8_t *cmd_param_info,
 						 uint32_t len);
 
+#if defined(CLD_PM_QOS) && defined(WLAN_FEATURE_LL_MODE)
+/**
+ * wma_vdev_bcn_latency_event_handler() - Get the latency info received in bcn
+ * @handle: WMA handle
+ * @event: data in event
+ * @len: length
+ *
+ * Return: 0 for success or error code
+ */
+int wma_vdev_bcn_latency_event_handler(void *handle, uint8_t *event,
+				       uint32_t len);
+#else
+static inline int wma_vdev_bcn_latency_event_handler(void *handle,
+						     uint8_t *event,
+						     uint32_t len)
+{
+	return 0;
+}
+#endif
+
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 /**
  * wma_sta_kickout_event()- send sta kickout event
@@ -1618,4 +1638,15 @@ QDF_STATUS wma_set_roam_triggers(tp_wma_handle wma_handle,
  */
 int wma_get_ani_level_evt_handler(void *handle, uint8_t *event_buf,
 				  uint32_t len);
+
+/**
+ * wma_delete_sta_req() - process delete sta request from UMAC
+ * @wma: wma handle
+ * @del_sta: delete sta params
+ * @wait_for_response: Wait for response from firmware
+ *
+ * Return: none
+ */
+void wma_delete_sta_req(tp_wma_handle wma, tpDeleteStaParams del_sta,
+			bool wait_for_response);
 #endif
