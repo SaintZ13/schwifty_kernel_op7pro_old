@@ -43,8 +43,6 @@
 #include "wlan_hdd_green_ap_cfg.h"
 #include "wlan_hdd_twt.h"
 
-static char *wlan_cfg_buf;
-
 static void
 cb_notify_set_roam_prefer5_g_hz(struct hdd_context *hdd_ctx,
 				unsigned long notify_id)
@@ -8773,8 +8771,13 @@ static void hdd_set_rx_mode_value(struct hdd_context *hdd_ctx)
  */
 QDF_STATUS hdd_parse_config_ini(struct hdd_context *hdd_ctx)
 {
+	int status = 0;
 	int i = 0;
-	char *buffer = wlan_cfg_buf, *line;
+	int retry = 0;
+	/** Pointer for firmware image data */
+	const struct firmware *fw = NULL;
+	char *buffer, *line, *pTemp = NULL;
+	size_t size;
 	char *name, *value;
 	/* cfgIniTable is static to avoid excess stack usage */
 	static struct hdd_cfg_entry cfgIniTable[MAX_CFG_INI_ITEMS];
@@ -8865,7 +8868,9 @@ QDF_STATUS hdd_parse_config_ini(struct hdd_context *hdd_ctx)
 	if (QDF_GLOBAL_MONITOR_MODE == cds_get_conparam())
 		hdd_override_all_ps(hdd_ctx);
 
-	qdf_mem_free(wlan_cfg_buf);
+config_exit:
+	release_firmware(fw);
+	qdf_mem_free(pTemp);
 	return qdf_status;
 }
 
@@ -10905,16 +10910,3 @@ QDF_STATUS hdd_update_nss(struct hdd_adapter *adapter, uint8_t nss)
 	hdd_set_policy_mgr_user_cfg(hdd_ctx);
 	return (status == false) ? QDF_STATUS_E_FAILURE : QDF_STATUS_SUCCESS;
 }
-
-static int __init wlan_copy_ini_buf(void)
-{
-	#include "wlan_cfg_ini.h"
-
-	size_t len = strlen(wlan_cfg) + 1;
-	wlan_cfg_buf = kmalloc(len, GFP_KERNEL);
-	memcpy(wlan_cfg_buf, wlan_cfg, len);
-
-	return 0;
-}
-
-module_init(wlan_copy_ini_buf);

@@ -1662,6 +1662,7 @@ ccflags-y += $(INCS)
 
 cppflags-y +=	-DANI_OS_TYPE_ANDROID=6 \
 		-Wall\
+		-Werror\
 		-D__linux__
 
 cppflags-$(CONFIG_PTT_SOCK_SVC_ENABLE) += -DPTT_SOCK_SVC_ENABLE
@@ -2167,6 +2168,7 @@ cppflags-$(CONFIG_WLAN_HANG_EVENT) += -DDP_SUPPORT_RECOVERY_NOTIFY
 cppflags-y += -DWLAN_CMD_SERIALIZATION_LOCKING
 
 ccflags-$(CONFIG_ENABLE_SIZE_OPTIMIZE) += -Os
+
 ccflags-$(CONFIG_WLAN_FEATURE_ETHTOOL) += -DWLAN_FEATURE_ETHTOOL
 # DFS component
 cppflags-y += -DWLAN_DFS_STATIC_MEM_ALLOC
