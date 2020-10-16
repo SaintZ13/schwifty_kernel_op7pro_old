@@ -43,6 +43,8 @@
 #include "wlan_hdd_green_ap_cfg.h"
 #include "wlan_hdd_twt.h"
 
+static char *wlan_cfg_buf;
+
 static void
 cb_notify_set_roam_prefer5_g_hz(struct hdd_context *hdd_ctx,
 				unsigned long notify_id)
@@ -3293,13 +3295,6 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_SUPPORT_MP0_DISCOVERY_DEFAULT,
 		     CFG_SUPPORT_MP0_DISCOVERY_MIN,
 		     CFG_SUPPORT_MP0_DISCOVERY_MAX),
-
-	REG_VARIABLE(CFG_NAN_FEATURE_CONFIG, WLAN_PARAM_Integer,
-		     struct hdd_config, nan_feature_config,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_NAN_FEATURE_CONFIG_DEFAULT,
-		     CFG_NAN_FEATURE_CONFIG_MIN,
-		     CFG_NAN_FEATURE_CONFIG_MAX),
 #endif
 
 	REG_VARIABLE(CFG_ENABLE_SELF_RECOVERY, WLAN_PARAM_Integer,
@@ -3750,13 +3745,6 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_DISABLE_RX_MRC_2G_MIN,
 		     CFG_DISABLE_RX_MRC_2G_MAX),
 
-	REG_VARIABLE(CFG_ENABLE_DYNAMIC_NSS_CHAIN_CFG, WLAN_PARAM_Integer,
-		     struct hdd_config, enable_dynamic_nss_chains_cfg,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_ENABLE_DYNAMIC_NSS_CHAIN_CFG_DEF,
-		     CFG_ENABLE_DYNAMIC_NSS_CHAIN_CFG_MIN,
-		     CFG_ENABLE_DYNAMIC_NSS_CHAIN_CFG_MAX),
-
 	REG_VARIABLE(CFG_DISABLE_RX_MRC_5G, WLAN_PARAM_Integer,
 		     struct hdd_config, disable_rx_mrc_5g,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -3869,13 +3857,6 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_STA_SAP_SCC_ON_LTE_COEX_CHAN_DEFAULT,
 		     CFG_STA_SAP_SCC_ON_LTE_COEX_CHAN_MIN,
 		     CFG_STA_SAP_SCC_ON_LTE_COEX_CHAN_MAX),
-
-	REG_VARIABLE(CFG_P2P_GO_ENABLE_FORCE_SCC, WLAN_PARAM_HexInteger,
-		     struct hdd_config, go_force_scc,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_P2P_GO_ENABLE_FORCE_SCC_DEFAULT,
-		     CFG_P2P_GO_ENABLE_FORCE_SCC_MIN,
-		     CFG_P2P_GO_ENABLE_FORCE_SCC_MAX),
 
 #ifdef FEATURE_WLAN_SCAN_PNO
 	REG_VARIABLE(CFG_PNO_CHANNEL_PREDICTION_NAME, WLAN_PARAM_Integer,
@@ -4097,30 +4078,6 @@ struct reg_table_entry g_registry_table[] = {
 		CFG_ROAM_BG_SCAN_BAD_RSSI_OFFSET_2G_DEFAULT,
 		CFG_ROAM_BG_SCAN_BAD_RSSI_OFFSET_2G_MIN,
 		CFG_ROAM_BG_SCAN_BAD_RSSI_OFFSET_2G_MAX),
-
-	REG_VARIABLE(CFG_ROAM_DATA_RSSI_THRESHOLD_TRIGGERS_NAME,
-		WLAN_PARAM_HexInteger, struct hdd_config,
-		roam_data_rssi_threshold_triggers,
-		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		CFG_ROAM_DATA_RSSI_THRESHOLD_TRIGGERS_DEFAULT,
-		CFG_ROAM_DATA_RSSI_THRESHOLD_TRIGGERS_MIN,
-		CFG_ROAM_DATA_RSSI_THRESHOLD_TRIGGERS_MAX),
-
-	REG_VARIABLE(CFG_ROAM_DATA_RSSI_THRESHOLD_NAME,
-		WLAN_PARAM_SignedInteger, struct hdd_config,
-		roam_data_rssi_threshold,
-		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		CFG_ROAM_DATA_RSSI_THRESHOLD_DEFAULT,
-		CFG_ROAM_DATA_RSSI_THRESHOLD_MIN,
-		CFG_ROAM_DATA_RSSI_THRESHOLD_MAX),
-
-	REG_VARIABLE(CFG_RX_DATA_INACTIVITY_TIME_NAME,
-		WLAN_PARAM_Integer, struct hdd_config,
-		rx_data_inactivity_time,
-		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		CFG_RX_DATA_INACTIVITY_TIME_DEFAULT,
-		CFG_RX_DATA_INACTIVITY_TIME_MIN,
-		CFG_RX_DATA_INACTIVITY_TIME_MAX),
 
 	REG_VARIABLE(CFG_ROAM_HO_DELAY_FOR_RX_NAME,
 		WLAN_PARAM_Integer, struct hdd_config,
@@ -5228,14 +5185,6 @@ struct reg_table_entry g_registry_table[] = {
 			    (void *)
 			    CFG_ACTION_OUI_DISABLE_AGGRESSIVE_EDCA_DEFAULT),
 
-	REG_VARIABLE_STRING(CFG_ACTION_OUI_RECONN_ASSOCTIMEOUT,
-			    WLAN_PARAM_String,
-			    struct hdd_config,
-			    action_oui_str[ACTION_OUI_HOST_RECONN],
-			    VAR_FLAGS_OPTIONAL,
-			    (void *)
-			    CFG_ACTION_OUI_RECONN_ASSOCTIMEOUT_DEFAULT),
-
 	REG_VARIABLE(CFG_DTIM_1CHRX_ENABLE_NAME, WLAN_PARAM_Integer,
 		struct hdd_config, enable_dtim_1chrx,
 		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -5706,19 +5655,11 @@ struct reg_table_entry g_registry_table[] = {
 
 #ifdef WLAN_FEATURE_SAE
 	REG_VARIABLE(CFG_IS_SAE_ENABLED_NAME, WLAN_PARAM_Integer,
-		     struct hdd_config, is_sae_enabled,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_IS_SAE_ENABLED_DEFAULT,
-		     CFG_IS_SAE_ENABLED_MIN,
-		     CFG_IS_SAE_ENABLED_MAX),
-
-	REG_VARIABLE(CFG_IS_SAP_SAE_ENABLED_NAME,
-		     WLAN_PARAM_Integer,
-		     struct hdd_config, sap_sae_enabled,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_IS_SAP_SAE_ENABLED_DEFAULT,
-		     CFG_IS_SAP_SAE_ENABLED_MIN,
-		     CFG_IS_SAP_SAE_ENABLED_MAX),
+		struct hdd_config, is_sae_enabled,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_IS_SAE_ENABLED_DEFAULT,
+		CFG_IS_SAE_ENABLED_MIN,
+		CFG_IS_SAE_ENABLED_MAX),
 #endif
 
 	REG_VARIABLE(CFG_BTM_SOLICITED_TIMEOUT, WLAN_PARAM_Integer,
@@ -6384,14 +6325,6 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_DISABLE_4WAY_HS_OFFLOAD_DEFAULT,
 		     CFG_DISABLE_4WAY_HS_OFFLOAD_MIN,
 		     CFG_DISABLE_4WAY_HS_OFFLOAD_MAX),
-
-	REG_VARIABLE(CFG_NB_COMMANDS_RATE_LIMIT, WLAN_PARAM_Integer,
-		     struct hdd_config, nb_commands_interval,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_NB_COMMANDS_RATE_LIMIT_DEFAULT,
-		     CFG_NB_COMMANDS_RATE_LIMIT_MIN,
-		     CFG_NB_COMMANDS_RATE_LIMIT_MAX),
-
 #ifdef FEATURE_WLAN_TIME_SYNC_FTM
 	REG_VARIABLE(CFG_ENABLE_TIME_SYNC_FTM, WLAN_PARAM_Integer,
 		     struct hdd_config, time_sync_ftm_enable,
@@ -7345,11 +7278,8 @@ static void hdd_wlm_cfg_log(struct hdd_context *hdd_ctx)
 static void hdd_cfg_print_sae(struct hdd_context *hdd_ctx)
 {
 	hdd_debug("Name = [%s] value = [%u]",
-		  CFG_IS_SAE_ENABLED_NAME,
-		  hdd_ctx->config->is_sae_enabled);
-	hdd_debug("Name = [%s] value = [%u]",
-		  CFG_IS_SAP_SAE_ENABLED_NAME,
-		  hdd_ctx->config->sap_sae_enabled);
+		CFG_IS_SAE_ENABLED_NAME,
+		hdd_ctx->config->is_sae_enabled);
 }
 #else
 static void hdd_cfg_print_sae(struct hdd_context *hdd_ctx)
@@ -8098,15 +8028,6 @@ void hdd_cfg_print(struct hdd_context *hdd_ctx)
 		CFG_ROAM_BG_SCAN_BAD_RSSI_OFFSET_2G_NAME,
 		hdd_ctx->config->roam_bad_rssi_thresh_offset_2g);
 	hdd_debug("Name = [%s] Value = [%u]",
-		  CFG_ROAM_DATA_RSSI_THRESHOLD_TRIGGERS_NAME,
-		  hdd_ctx->config->roam_data_rssi_threshold_triggers);
-	hdd_debug("Name = [%s] Value = [%d]",
-		  CFG_ROAM_DATA_RSSI_THRESHOLD_NAME,
-		  hdd_ctx->config->roam_data_rssi_threshold);
-	hdd_debug("Name = [%s] Value = [%u]",
-		  CFG_RX_DATA_INACTIVITY_TIME_NAME,
-		  hdd_ctx->config->rx_data_inactivity_time);
-	hdd_debug("Name = [%s] Value = [%u]",
 		CFG_ROAM_HO_DELAY_FOR_RX_NAME,
 		hdd_ctx->config->ho_delay_for_rx);
 	hdd_debug("Name = [%s] Value = [%u]",
@@ -8450,8 +8371,6 @@ void hdd_cfg_print(struct hdd_context *hdd_ctx)
 		hdd_ctx->config->enable_phy_reg_retention);
 	hdd_debug("Name = [btm_offload_config] value = [0x%x]",
 		  hdd_ctx->config->btm_offload_config);
-	hdd_debug("Name = [btm_validity_timer] value = [0x%x]",
-		  hdd_ctx->config->btm_validity_timer);
 	hdd_cfg_print_sae(hdd_ctx);
 	hdd_debug("Name = [btm_solicited_timeout] value = [0x%x]",
 		  hdd_ctx->config->btm_solicited_timeout);
@@ -8771,55 +8690,14 @@ static void hdd_set_rx_mode_value(struct hdd_context *hdd_ctx)
  */
 QDF_STATUS hdd_parse_config_ini(struct hdd_context *hdd_ctx)
 {
-	int status = 0;
 	int i = 0;
-	int retry = 0;
-	/** Pointer for firmware image data */
-	const struct firmware *fw = NULL;
-	char *buffer, *line, *pTemp = NULL;
-	size_t size;
+	char *buffer = wlan_cfg_buf, *line;
 	char *name, *value;
 	/* cfgIniTable is static to avoid excess stack usage */
 	static struct hdd_cfg_entry cfgIniTable[MAX_CFG_INI_ITEMS];
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
 
 	memset(cfgIniTable, 0, sizeof(cfgIniTable));
-
-	do {
-		if (status == -EAGAIN)
-			msleep(HDD_CFG_REQUEST_FIRMWARE_DELAY);
-
-		status = request_firmware(&fw, WLAN_INI_FILE,
-					  hdd_ctx->parent_dev);
-
-		retry++;
-	} while ((retry < HDD_CFG_REQUEST_FIRMWARE_RETRIES) &&
-		 (status == -EAGAIN));
-
-	if (status) {
-		hdd_alert("request_firmware failed %d", status);
-		qdf_status = QDF_STATUS_E_FAILURE;
-		goto config_exit;
-	}
-	if (!fw || !fw->data || !fw->size) {
-		hdd_alert("%s download failed", WLAN_INI_FILE);
-		qdf_status = QDF_STATUS_E_FAILURE;
-		goto config_exit;
-	}
-
-	hdd_debug("qcom_cfg.ini Size %zu", fw->size);
-
-	buffer = (char *)qdf_mem_malloc(fw->size + 1);
-
-	if (NULL == buffer) {
-		hdd_err("qdf_mem_malloc failure");
-		release_firmware(fw);
-		return QDF_STATUS_E_NOMEM;
-	}
-	pTemp = buffer;
-
-	qdf_mem_copy((void *)buffer, (void *)fw->data, fw->size);
-	size = fw->size;
 
 	while (buffer != NULL) {
 		line = get_next_line(buffer);
@@ -8868,9 +8746,7 @@ QDF_STATUS hdd_parse_config_ini(struct hdd_context *hdd_ctx)
 	if (QDF_GLOBAL_MONITOR_MODE == cds_get_conparam())
 		hdd_override_all_ps(hdd_ctx);
 
-config_exit:
-	release_firmware(fw);
-	qdf_mem_free(pTemp);
+	qdf_mem_free(wlan_cfg_buf);
 	return qdf_status;
 }
 
@@ -9204,14 +9080,7 @@ static bool hdd_update_vht_cap_in_cfg(struct hdd_context *hdd_ctx)
 			hdd_err("Couldn't pass on WNI_CFG_VHT_MAX_MPDU_LENGTH to CFG");
 		}
 
-		/* Get SU Bformer HW capability */
-		if (sme_cfg_get_int(mac_handle, WNI_CFG_VHT_SU_BEAMFORMER_CAP, &val) ==
-							QDF_STATUS_E_FAILURE) {
-			status = false;
-			hdd_err("Could not get WNI_CFG_VHT_SU_BEAMFORMER_CAP");
-		}
-
-		if (val && !config->enable_su_tx_bformer) {
+		if (config->enable2x2 && config->enable_su_tx_bformer) {
 			if (sme_cfg_set_int(mac_handle,
 					WNI_CFG_VHT_SU_BEAMFORMER_CAP,
 					config->enable_su_tx_bformer) ==
@@ -9235,16 +9104,8 @@ static bool hdd_update_vht_cap_in_cfg(struct hdd_context *hdd_ctx)
 		hdd_err("Couldn't pass on WNI_CFG_VHT_RXSTBC to CFG");
 	}
 
-	/* first get HW TX STBC capability */
-	if (sme_cfg_get_int(mac_handle, WNI_CFG_VHT_TXSTBC, &val) ==
-							QDF_STATUS_E_FAILURE) {
-		status = false;
-		hdd_err("Could not get WNI_CFG_VHT_TXSTBC");
-	}
-
-	/* set TX STBC combined with ini setting capability */
 	if (sme_cfg_set_int(mac_handle, WNI_CFG_VHT_TXSTBC,
-			    config->enableTxSTBC && val) == QDF_STATUS_E_FAILURE) {
+			    config->enableTxSTBC) == QDF_STATUS_E_FAILURE) {
 		status = false;
 		hdd_err("Couldn't pass on WNI_CFG_VHT_TXSTBC to CFG");
 	}
@@ -9604,13 +9465,6 @@ bool hdd_update_config_cfg(struct hdd_context *hdd_ctx)
 		hdd_err("Couldn't pass on WNI_CFG_ASSOC_STA_LIMIT to CFG");
 	}
 
-	if (sme_cfg_set_int(mac_handle, WNI_CFG_SAP_SAE_ENABLED,
-			    config->sap_sae_enabled) ==
-			    QDF_STATUS_E_FAILURE) {
-		status = false;
-		hdd_err("Couldn't pass on WNI_CFG_SAP_SAE_ENABLED to CCM");
-	}
-
 	return status;
 }
 
@@ -9693,7 +9547,6 @@ QDF_STATUS hdd_set_policy_mgr_user_cfg(struct hdd_context *hdd_ctx)
 		hdd_ctx->config->channel_select_logic_conc;
 	user_cfg->sta_sap_scc_on_lte_coex_chan =
 		hdd_ctx->config->sta_sap_scc_on_lte_coex_chan;
-	user_cfg->go_force_scc = hdd_ctx->config->go_force_scc;
 	user_cfg->enable_dfs_master_cap =
 		hdd_ctx->config->enableDFSMasterCap;
 	status = policy_mgr_set_user_cfg(hdd_ctx->psoc, user_cfg);
@@ -10283,12 +10136,6 @@ QDF_STATUS hdd_set_sme_config(struct hdd_context *hdd_ctx)
 		hdd_ctx->config->roam_bg_scan_client_bitmap;
 	smeConfig->csrConfig.roam_bad_rssi_thresh_offset_2g =
 		hdd_ctx->config->roam_bad_rssi_thresh_offset_2g;
-	smeConfig->csrConfig.roam_data_rssi_threshold_triggers =
-		hdd_ctx->config->roam_data_rssi_threshold_triggers;
-	smeConfig->csrConfig.roam_data_rssi_threshold =
-		hdd_ctx->config->roam_data_rssi_threshold;
-	smeConfig->csrConfig.rx_data_inactivity_time =
-		hdd_ctx->config->rx_data_inactivity_time;
 	smeConfig->csrConfig.ho_delay_for_rx =
 		hdd_ctx->config->ho_delay_for_rx;
 
@@ -10910,3 +10757,16 @@ QDF_STATUS hdd_update_nss(struct hdd_adapter *adapter, uint8_t nss)
 	hdd_set_policy_mgr_user_cfg(hdd_ctx);
 	return (status == false) ? QDF_STATUS_E_FAILURE : QDF_STATUS_SUCCESS;
 }
+
+static int __init wlan_copy_ini_buf(void)
+{
+	#include "wlan_cfg_ini.h"
+
+	size_t len = strlen(wlan_cfg) + 1;
+	wlan_cfg_buf = kmalloc(len, GFP_KERNEL);
+	memcpy(wlan_cfg_buf, wlan_cfg, len);
+
+	return 0;
+}
+
+module_init(wlan_copy_ini_buf);

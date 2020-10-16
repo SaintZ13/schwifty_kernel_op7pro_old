@@ -208,8 +208,6 @@ void lim_handle_del_bss_in_re_assoc_context(tpAniSirGlobal pMac,
 			qdf_mem_free(beacon_struct);
 			goto error;
 		}
-		qdf_mem_free(assocRsp->sha384_ft_subelem.gtk);
-		qdf_mem_free(assocRsp->sha384_ft_subelem.igtk);
 		qdf_mem_free(assocRsp);
 		qdf_mem_free(beacon_struct);
 		psessionEntry->limAssocResponseData = NULL;
@@ -336,8 +334,6 @@ void lim_handle_add_bss_in_re_assoc_context(tpAniSirGlobal pMac,
 			qdf_mem_free(pBeaconStruct);
 			goto Error;
 		}
-		qdf_mem_free(assocRsp->sha384_ft_subelem.gtk);
-		qdf_mem_free(assocRsp->sha384_ft_subelem.igtk);
 		qdf_mem_free(assocRsp);
 		psessionEntry->limAssocResponseData = NULL;
 		qdf_mem_free(pBeaconStruct);

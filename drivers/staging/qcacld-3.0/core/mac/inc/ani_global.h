@@ -751,8 +751,7 @@ struct mgmt_frm_reg_info {
 };
 
 typedef struct sRrmContext {
-	struct rrm_config_param rrmConfig;
-	tRrmSMEContext rrmSmeContext[MAX_MEASUREMENT_REQUEST];
+	tRrmSMEContext rrmSmeContext;
 	tRrmPEContext rrmPEContext;
 } tRrmContext, *tpRrmContext;
 
@@ -849,7 +848,6 @@ typedef struct sAniSirGlobal {
 	uint8_t beacon_offload;
 	bool pmf_offload;
 	bool is_fils_roaming_supported;
-	bool stop_all_host_scan_support;
 	bool enable5gEBT;
 	uint8_t f_prefer_non_dfs_on_radar;
 	uint32_t fEnableDebugLog;

@@ -1096,11 +1096,10 @@ static void __lim_process_qos_map_configure_frame(tpAniSirGlobal mac_ctx,
 		return;
 	}
 	lim_send_sme_mgmt_frame_ind(mac_ctx, mac_hdr->fc.subType,
-				    (uint8_t *)mac_hdr,
-				    frame_len + sizeof(tSirMacMgmtHdr), 0,
-				    WMA_GET_RX_CH(rx_pkt_info), session,
-				    WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
-				    RXMGMT_FLAG_NONE);
+			(uint8_t *) mac_hdr,
+			frame_len + sizeof(tSirMacMgmtHdr), 0,
+			WMA_GET_RX_CH(rx_pkt_info), session,
+			WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info));
 }
 
 #ifdef ANI_SUPPORT_11H
@@ -1311,8 +1310,7 @@ __lim_process_radio_measure_request(tpAniSirGlobal pMac, uint8_t *pRxPacketInfo,
 			 HIGH_SEQ_NUM_OFFSET) |
 			pHdr->seqControl.seqNumLo);
 	if (curr_seq_num == pMac->rrm.rrmPEContext.prev_rrm_report_seq_num &&
-	    (pMac->rrm.rrmPEContext.pCurrentReq[DEFAULT_RRM_IDX] ||
-	     pMac->rrm.rrmPEContext.pCurrentReq[DEFAULT_RRM_IDX + 1])) {
+	    pMac->rrm.rrmPEContext.pCurrentReq) {
 		pe_err("rrm report req frame, seq num: %d is already in progress, drop it",
 			curr_seq_num);
 		return;
@@ -1320,10 +1318,9 @@ __lim_process_radio_measure_request(tpAniSirGlobal pMac, uint8_t *pRxPacketInfo,
 	/* Save seq no of currently processing rrm report req frame */
 	pMac->rrm.rrmPEContext.prev_rrm_report_seq_num = curr_seq_num;
 	lim_send_sme_mgmt_frame_ind(pMac, pHdr->fc.subType, (uint8_t *)pHdr,
-				    frameLen + sizeof(tSirMacMgmtHdr), 0,
-				    WMA_GET_RX_CH(pRxPacketInfo), psessionEntry,
-				    WMA_GET_RX_RSSI_NORMALIZED(pRxPacketInfo),
-				    RXMGMT_FLAG_NONE);
+		frameLen + sizeof(tSirMacMgmtHdr), 0,
+		WMA_GET_RX_CH(pRxPacketInfo), psessionEntry,
+		WMA_GET_RX_RSSI_NORMALIZED(pRxPacketInfo));
 
 	frm = qdf_mem_malloc(sizeof(*frm));
 	if (frm == NULL) {
@@ -1558,7 +1555,7 @@ static void __lim_process_sa_query_response_action_frame(tpAniSirGlobal pMac,
 					    WMA_GET_RX_CH(pRxPacketInfo),
 					    psessionEntry,
 					    WMA_GET_RX_RSSI_NORMALIZED(
-					    pRxPacketInfo), RXMGMT_FLAG_NONE);
+					    pRxPacketInfo));
 		return;
 	}
 
@@ -1992,7 +1989,7 @@ void lim_process_action_frame(tpAniSirGlobal mac_ctx,
 					frame_len + sizeof(tSirMacMgmtHdr),
 					session->smeSessionId,
 					WMA_GET_RX_CH(rx_pkt_info),
-					session, rssi, RXMGMT_FLAG_NONE);
+					session, rssi);
 			break;
 		default:
 			pe_debug("Action ID: %d not handled in WNM category",
@@ -2082,7 +2079,7 @@ void lim_process_action_frame(tpAniSirGlobal mac_ctx,
 					WMA_GET_RX_CH(rx_pkt_info),
 					session,
 					WMA_GET_RX_RSSI_NORMALIZED(
-					rx_pkt_info), RXMGMT_FLAG_NONE);
+					rx_pkt_info));
 		} else {
 			pe_debug("Dropping the vendor specific action frame"
 					"beacause of (WES Mode not enabled "
@@ -2141,7 +2138,7 @@ void lim_process_action_frame(tpAniSirGlobal mac_ctx,
 					session->smeSessionId,
 					WMA_GET_RX_CH(rx_pkt_info), session,
 					WMA_GET_RX_RSSI_NORMALIZED(
-					rx_pkt_info), RXMGMT_FLAG_NONE);
+					rx_pkt_info));
 			break;
 		default:
 			pe_debug("Unhandled public action frame: %d",
@@ -2206,7 +2203,7 @@ void lim_process_action_frame(tpAniSirGlobal mac_ctx,
 					    WMA_GET_RX_CH(rx_pkt_info),
 					    session,
 					    WMA_GET_RX_RSSI_NORMALIZED(
-					    rx_pkt_info), RXMGMT_FLAG_NONE);
+					    rx_pkt_info));
 		break;
 	}
 	case SIR_MAC_ACTION_PROT_DUAL_PUB:
@@ -2223,8 +2220,7 @@ void lim_process_action_frame(tpAniSirGlobal mac_ctx,
 				mac_hdr->fc.subType, (uint8_t *) mac_hdr,
 				frame_len + sizeof(tSirMacMgmtHdr),
 				session->smeSessionId,
-				WMA_GET_RX_CH(rx_pkt_info), session, rssi,
-				RXMGMT_FLAG_NONE);
+				WMA_GET_RX_CH(rx_pkt_info), session, rssi);
 			break;
 		default:
 			pe_debug("Unhandled - Protected Dual Public Action");
@@ -2328,8 +2324,7 @@ void lim_process_action_frame_no_session(tpAniSirGlobal pMac, uint8_t *pBd)
 					(uint8_t *) mac_hdr,
 					frame_len + sizeof(tSirMacMgmtHdr), 0,
 					WMA_GET_RX_CH(pBd), NULL,
-					WMA_GET_RX_RSSI_NORMALIZED(pBd),
-					RXMGMT_FLAG_NONE);
+					WMA_GET_RX_RSSI_NORMALIZED(pBd));
 			break;
 		default:
 			pe_warn("Unhandled public action frame: %x",

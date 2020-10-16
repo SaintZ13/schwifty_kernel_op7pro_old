@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -162,7 +162,15 @@ int qdf_wake_up_process(qdf_thread_t *thread)
 }
 qdf_export_symbol(qdf_wake_up_process);
 
-#if defined(BUILD_DEBUG_VERSION)
+/* save_stack_trace_tsk() is exported for:
+ * 1) non-arm architectures
+ * 2) arm architectures in kernel versions >=4.14
+ * 3) backported kernels defining BACKPORTED_EXPORT_SAVE_STACK_TRACE_TSK_ARM
+ */
+#if ((defined(WLAN_HOST_ARCH_ARM) && !WLAN_HOST_ARCH_ARM) || \
+	LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0) || \
+	defined(BACKPORTED_EXPORT_SAVE_STACK_TRACE_TSK_ARM)) && \
+	defined(CONFIG_STACKTRACE)
 #define QDF_PRINT_TRACE_COUNT 32
 void qdf_print_thread_trace(qdf_thread_t *thread)
 {
@@ -189,32 +197,3 @@ qdf_thread_t *qdf_get_current_task(void)
 	return current;
 }
 qdf_export_symbol(qdf_get_current_task);
-
-void
-qdf_thread_set_cpus_allowed_mask(qdf_thread_t *thread, qdf_cpu_mask *new_mask)
-{
-	set_cpus_allowed_ptr(thread, new_mask);
-}
-
-qdf_export_symbol(qdf_thread_set_cpus_allowed_mask);
-
-void qdf_cpumask_clear(qdf_cpu_mask *dstp)
-{
-	cpumask_clear(dstp);
-}
-
-qdf_export_symbol(qdf_cpumask_clear);
-
-void qdf_cpumask_set_cpu(unsigned int cpu, qdf_cpu_mask *dstp)
-{
-	cpumask_set_cpu(cpu, dstp);
-}
-
-qdf_export_symbol(qdf_cpumask_set_cpu);
-
-void qdf_cpumask_setall(qdf_cpu_mask *dstp)
-{
-	cpumask_setall(dstp);
-}
-
-qdf_export_symbol(qdf_cpumask_setall);

@@ -154,8 +154,7 @@ static QDF_STATUS wlan_serialization_timer_destroy(
 #ifdef CONFIG_MCL
 static void wlan_serialization_non_scan_timeout_action(void)
 {
-	qdf_trigger_self_recovery(NULL, QDF_REASON_SERIALIZER_TIMEOUT);
-
+	qdf_trigger_self_recovery();
 }
 #else
 static void wlan_serialization_non_scan_timeout_action(void)
