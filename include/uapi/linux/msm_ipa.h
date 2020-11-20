@@ -425,6 +425,7 @@ enum ipa_client_type {
 #define IPA_CLIENT_MHI_PRIME_DPL_PROD IPA_CLIENT_MHI_PRIME_DPL_PROD
 
 
+
 #define IPA_CLIENT_IS_APPS_CONS(client) \
 	((client) == IPA_CLIENT_APPS_LAN_CONS || \
 	(client) == IPA_CLIENT_APPS_WAN_CONS || \
