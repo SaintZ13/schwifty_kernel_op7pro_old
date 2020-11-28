@@ -15,6 +15,7 @@
 #include <linux/types.h>
 #include <linux/clk.h>
 #include <linux/bitops.h>
+#include <linux/delay.h>
 #include <soc/snd_event.h>
 #include <linux/pm_runtime.h>
 #include <dsp/audio_notifier.h>
@@ -484,6 +485,19 @@ static int lpi_notifier_service_cb(struct notifier_block *this,
 	case AUDIO_NOTIFIER_SERVICE_UP:
 		if (initial_boot)
 			initial_boot = false;
+
+		/* Reset HW votes after SSR */
+		if (!lpi_dev_up) {
+			/* Add 100ms sleep to ensure AVS is up after SSR */
+			msleep(100);
+			if (state->lpass_core_hw_vote)
+				digital_cdc_rsc_mgr_hw_vote_reset(
+					state->lpass_core_hw_vote);
+			if (state->lpass_audio_hw_vote)
+				digital_cdc_rsc_mgr_hw_vote_reset(
+					state->lpass_audio_hw_vote);
+		}
+
 		lpi_dev_up = true;
 		snd_event_notify(lpi_dev, SND_EVENT_UP);
 		break;
