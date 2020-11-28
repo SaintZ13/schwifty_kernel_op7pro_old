@@ -1181,11 +1181,8 @@ again:
 	if (force_flush) {
 		force_flush = 0;
 		tlb_flush_mmu(tlb);
-	}
-
-	if (addr != end) {
-		progress = 0;
-		goto again;
+		if (addr != end)
+			goto again;
 	}
 
 	return addr;
