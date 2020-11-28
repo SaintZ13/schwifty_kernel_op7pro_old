@@ -444,7 +444,31 @@ int atl_ipa_moderate_event(struct ipa_eth_channel *ch, unsigned long event,
 	return atl_fwd_set_ring_intr_mod(CH_RING(ch), min_usecs, max_usecs);
 }
 
-#if IPA_ETH_API_VER >= 7
+static int atl_ipa_fwd_receive_skb(struct net_device *ndev, struct sk_buff *skb)
+{
+	struct atl_nic *nic = netdev_priv(ndev);
+	struct iphdr *ip;
+
+	ip = (struct iphdr *)&skb->data[ETH_HLEN];
+
+	/* Submit packet to network stack */
+	/* If its a ping packet submit it via rx_ni else use rx */
+	if (ip->protocol == IPPROTO_ICMP) {
+		nic->stats.rx_fwd.packets++;
+		nic->stats.rx_fwd.bytes += skb->len;
+		skb->protocol = eth_type_trans(skb, ndev);
+		return netif_rx_ni(skb);
+	} else if ((nic->stats.rx_fwd.packets %
+		IPA_ETH_RX_SOFTIRQ_THRESH) == 0) {
+		nic->stats.rx_fwd.packets++;
+		nic->stats.rx_fwd.bytes += skb->len;
+		skb->protocol = eth_type_trans(skb, ndev);
+		return netif_rx_ni(skb);
+	} else {
+		return atl_fwd_receive_skb(ndev, skb);
+	}
+}
+
 static int atl_ipa_receive_skb(struct ipa_eth_device *eth_dev,
 			       struct sk_buff *skb, bool in_napi)
 {

@@ -114,7 +114,7 @@
 			mhi,chan-dir = <1>;
 			mhi,data-type = <3>;
 			mhi,ee = <0x4>;
-			mhi,offload-chan;
+			mhi,db-mode-switch;
 		};
 
 		mhi_chan@106 {
