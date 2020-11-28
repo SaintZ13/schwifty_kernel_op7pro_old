@@ -4399,8 +4399,8 @@ static int DWC_ETH_QOS_config_ip4_filters(struct net_device *dev,
 			   sizeof(struct DWC_ETH_QOS_l3_l4_filter)))
 		return -EFAULT;
 
-	if ((l_l3_filter.filter_no + 1) > pdata->hw_feat.l3l4_filter_num ||
-		l_l3_filter.filter_no > (UINT_MAX - pdata->hw_feat.l3l4_filter_num)) {
+	if (l_l3_filter.filter_no > (UINT_MAX - pdata->hw_feat.l3l4_filter_num) ||
+		(l_l3_filter.filter_no + 1) > pdata->hw_feat.l3l4_filter_num) {
 		dev_alert(&pdata->pdev->dev, "%d filter is not supported in the HW\n",
 			  l_l3_filter.filter_no);
 		return DWC_ETH_QOS_NO_HW_SUPPORT;
@@ -4469,8 +4469,8 @@ static int DWC_ETH_QOS_config_ip6_filters(struct net_device *dev,
 			   sizeof(struct DWC_ETH_QOS_l3_l4_filter)))
 		return -EFAULT;
 
-	if ((l_l3_filter.filter_no + 1) > pdata->hw_feat.l3l4_filter_num ||
-		l_l3_filter.filter_no > (UINT_MAX - pdata->hw_feat.l3l4_filter_num)) {
+	if (l_l3_filter.filter_no > (UINT_MAX - pdata->hw_feat.l3l4_filter_num) ||
+		(l_l3_filter.filter_no + 1) > pdata->hw_feat.l3l4_filter_num) {
 		dev_alert(&pdata->pdev->dev, "%d filter is not supported in the HW\n",
 			  l_l3_filter.filter_no);
 		return DWC_ETH_QOS_NO_HW_SUPPORT;
@@ -4539,8 +4539,8 @@ static int DWC_ETH_QOS_config_tcp_udp_filters(struct net_device *dev,
 			   sizeof(struct DWC_ETH_QOS_l3_l4_filter)))
 		return -EFAULT;
 
-	if ((l_l4_filter.filter_no + 1) > pdata->hw_feat.l3l4_filter_num ||
-		l_l4_filter.filter_no > (UINT_MAX - pdata->hw_feat.l3l4_filter_num)) {
+	if (l_l4_filter.filter_no > (UINT_MAX - pdata->hw_feat.l3l4_filter_num) ||
+		(l_l4_filter.filter_no + 1) > pdata->hw_feat.l3l4_filter_num) {
 		dev_alert(&pdata->pdev->dev, "%d filter is not supported in the HW\n",
 			  l_l4_filter.filter_no);
 		return DWC_ETH_QOS_NO_HW_SUPPORT;
@@ -5100,8 +5100,7 @@ static int ETH_PTPCLK_Config(struct DWC_ETH_QOS_prv_data *pdata, struct ifr_data
 	struct hw_if_struct *hw_if = &pdata->hw_if;
 	int ret = 0;
 
-	if ((eth_pps_cfg->ppsout_ch < 0) ||
-		(eth_pps_cfg->ppsout_ch >= pdata->hw_feat.pps_out_num))
+	if (eth_pps_cfg->ppsout_ch >= pdata->hw_feat.pps_out_num)
 	{
 		EMACERR("PPS: PPS output channel %u is invalid \n", eth_pps_cfg->ppsout_ch);
 		return  -EOPNOTSUPP;
@@ -5269,8 +5268,7 @@ int ETH_PPSOUT_Config(struct DWC_ETH_QOS_prv_data *pdata, struct ifr_data_struct
 		EMACDBG("using default ptp clock \n");
 	}
 
-	if ((eth_pps_cfg->ppsout_ch < 0) ||
-		(eth_pps_cfg->ppsout_ch >= pdata->hw_feat.pps_out_num))
+	if (eth_pps_cfg->ppsout_ch >= pdata->hw_feat.pps_out_num)
 	{
 		EMACERR("PPS: PPS output channel %u is invalid \n", eth_pps_cfg->ppsout_ch);
 		return  -EOPNOTSUPP;
@@ -5820,8 +5818,12 @@ static int DWC_ETH_QOS_handle_prv_ioctl(struct DWC_ETH_QOS_prv_data *pdata,
 
 		if(pdata->hw_feat.pps_out_num == 0)
 			ret = -EOPNOTSUPP;
-		else
-			ret = ETH_PPSOUT_Config(pdata, req);
+		else {
+			if (eth_pps_cfg.ptpclk_freq > UINT_MAX)
+				return -EFAULT;
+			else
+				ret = ETH_PPSOUT_Config(pdata, &eth_pps_cfg);
+		}
 		break;
 #endif
 
@@ -6184,6 +6186,13 @@ static int DWC_ETH_QOS_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	   if (copy_from_user(&req, ifr->ifr_ifru.ifru_data,
 			   sizeof(struct ifr_data_struct)))
 			return -EFAULT;
+
+		if (req.qinx > DWC_ETH_QOS_QUEUE_CNT) {
+			dev_alert(&pdata->pdev->dev,
+			  "Hardware has only %d Tx/Rx Queues\n",
+			DWC_ETH_QOS_QUEUE_CNT);
+			return -EFAULT;
+		}
 		ret = DWC_ETH_QOS_handle_prv_ioctl(pdata, &req);
 		req.command_error = ret;
 
