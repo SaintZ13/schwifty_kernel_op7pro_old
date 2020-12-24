@@ -195,6 +195,20 @@ static int cnss_wlfw_host_cap_send_sync(struct cnss_plat_data *plat_priv)
 	req->cal_done = plat_priv->cal_done;
 	cnss_pr_dbg("Calibration done is %d\n", plat_priv->cal_done);
 
+<<<<<<< HEAD
+=======
+	if (cnss_bus_is_smmu_s1_enabled(plat_priv) &&
+	    !cnss_bus_get_iova(plat_priv, &iova_start, &iova_size) &&
+	    !cnss_bus_get_iova_ipa(plat_priv, &iova_ipa_start,
+				   &iova_ipa_size)) {
+		req->ddr_range_valid = 1;
+		req->ddr_range[0].start = iova_start;
+		req->ddr_range[0].size = iova_size + iova_ipa_size;
+		cnss_pr_dbg("Sending iova starting 0x%llx with size 0x%llx\n",
+			    req->ddr_range[0].start, req->ddr_range[0].size);
+	}
+
+>>>>>>> 925916287b5f... Merge tag 'LA.UM.8.9.r1-11200-SM6xx.0'
 	ret = qmi_txn_init(&plat_priv->qmi_wlfw, &txn,
 			   wlfw_host_cap_resp_msg_v01_ei, resp);
 	if (ret < 0) {

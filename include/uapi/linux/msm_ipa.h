@@ -167,6 +167,11 @@
 #define QMI_IPA_MAX_CLIENT_DST_PIPES 4
 
 /**
+ * Max number of clients supported for mac based exception
+ */
+#define IPA_MAX_NUM_MAC_FLT 32
+
+/**
  * MAX number of the FLT_RT stats counter supported.
  */
 #define IPA_MAX_FLT_RT_CNT_INDEX (128)
