@@ -451,14 +451,6 @@ static ssize_t mhi_uci_read(struct file *file,
 		goto read_error;
 	}
 
-	spin_lock_bh(&uci_chan->lock);
-	/* Buffer already queued from diff thread while we dropped lock ? */
-	if (to_copy && !uci_chan->rx_size) {
-		MSG_VERB("Bailout as buffer already queued (%lu %lu)\n",
-			 to_copy, uci_chan->rx_size);
-		goto read_error;
-	}
-
 	MSG_VERB("Copied %lu of %lu bytes\n", to_copy, uci_chan->rx_size);
 	uci_chan->rx_size -= to_copy;
 
