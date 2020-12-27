@@ -6101,29 +6101,3 @@ CONFIG_TCP_CONG_AGILESD=y
 # CONFIG_DEFAULT_WESTWOOD is not set
 CONFIG_DEFAULT_BBR=y
 CONFIG_DEFAULT_TCP_CONG="bbr"
-<<<<<<< HEAD:arch/arm64/configs/kirisakura_defconfig
-
-#
-# WLAN Driver
-#
-CONFIG_QCA_CLD_WLAN=y
-
-#
-# Qualcomm RmNet extensions
-#
-# CONFIG_RMNET_PERF is not set
-# CONFIG_RMNET_SHS is not set
-
-CONFIG_WAKE_GESTURES=y
-# CONFIG_DYNAMIC_STUNE_BOOST is not set
-CONFIG_KLAPSE=y
-CONFIG_BOEFFLA_WL_BLOCKER=y
-CONFIG_INIT_ON_ALLOC_DEFAULT_ON=y
-
-CONFIG_COMPAT_VDSO=y
-CONFIG_KUSER_HELPERS=y
-
-CONFIG_ARCH_HAS_RELR=y
-CONFIG_RELR=y
-=======
->>>>>>> 45287bff5d45... schwifty: lets get Schwifty:arch/arm64/configs/schwifty_defconfig
