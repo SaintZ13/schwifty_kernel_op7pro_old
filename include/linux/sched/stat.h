@@ -35,19 +35,6 @@ static inline unsigned int sched_get_cpu_util(int cpu)
 }
 #endif
 
-#ifdef CONFIG_SCHED_WALT
-extern void sched_update_hyst_times(void);
-extern u64 sched_lpm_disallowed_time(int cpu);
-#else
-static inline void sched_update_hyst_times(void)
-{
-}
-static inline u64 sched_lpm_disallowed_time(int cpu)
-{
-	return 0;
-}
-#endif
-
 static inline int sched_info_on(void)
 {
 #ifdef CONFIG_SCHEDSTATS

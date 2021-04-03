@@ -39,24 +39,6 @@
 #include "sched.h"
 #include "tune.h"
 #include "walt.h"
-#ifdef CONFIG_ONEPLUS_HEALTHINFO
-#include <linux/oem/oneplus_healthinfo.h>
-#endif
-
-#include <oneplus/uxcore/opchain_helper.h>
-
-#ifdef CONFIG_HOUSTON
-#include <oneplus/houston/houston_helper.h>
-#endif
-#ifdef CONFIG_ONEPLUS_FG_OPT
-extern unsigned int ht_fuse_boost;
-#endif
-#ifdef CONFIG_IM
-#include <linux/oem/im.h>
-#endif
-#ifdef CONFIG_CONTROL_CENTER
-#include <linux/oem/control_center.h>
-#endif
 
 #ifdef CONFIG_SMP
 static inline bool get_rtg_status(struct task_struct *p);
@@ -92,6 +74,7 @@ walt_dec_cfs_rq_stats(struct cfs_rq *cfs_rq, struct task_struct *p) {}
 
 #define walt_inc_throttled_cfs_rq_stats(...)
 #define walt_dec_throttled_cfs_rq_stats(...)
+
 #endif
 
 /*
@@ -118,14 +101,6 @@ unsigned int sysctl_sched_sync_hint_enable = 1;
  * Enable/disable using cstate knowledge in idle sibling selection
  */
 unsigned int sysctl_sched_cstate_aware = 1;
-
-#ifdef CONFIG_ONEPLUS_HEALTHINFO
-extern void ohm_schedstats_record(int sched_type, struct task_struct *task, u64 delta);
-#endif
-
-#ifdef CONFIG_ONEPLUS_HEALTHINFO
-extern void  update_stuck_trace_info(struct task_struct *tsk, int trace_type, unsigned int cpu, u64 delta);
-#endif
 
 /*
  * The initial- and re-scaling of tunables is configurable
@@ -919,11 +894,6 @@ static void update_curr(struct cfs_rq *cfs_rq)
 	u64 now = rq_clock_task(rq_of(cfs_rq));
 	u64 delta_exec;
 
-#ifdef CONFIG_ONEPLUS_TASKLOAD_INFO
-	u64 window_index = sample_window.window_index;
-	bool index = ODD(window_index);
-#endif
-
 	if (unlikely(!curr))
 		return;
 
@@ -944,37 +914,10 @@ static void update_curr(struct cfs_rq *cfs_rq)
 
 	if (entity_is_task(curr)) {
 		struct task_struct *curtask = task_of(curr);
-#ifdef CONFIG_ONEPLUS_TASKLOAD_INFO
-		if (window_index != curtask->tli[index].task_sample_index) {
-			curtask->tli[index].task_sample_index = window_index;
-			curtask->tli[index].write_bytes = 0;
-			curtask->tli[index].read_bytes = 0;
-			if (current_is_fg()) {
-				curtask->tli[index].runtime[1] = delta_exec;
-				curtask->tli[index].runtime[0] = 0;
-			} else {
-				curtask->tli[index].runtime[0] = delta_exec;
-				curtask->tli[index].runtime[1] = 0;
-			}
-			curtask->tli[index].tli_overload_flag = 0;
-		} else {
-			if (current_is_fg()) {
-				curtask->tli[index].runtime[1] += delta_exec;
-				if (curtask->tli[index].runtime[1] > ohm_runtime_thresh_fg)
-					curtask->tli[index].tli_overload_flag |= TASK_CPU_OVERLOAD_FG_FLAG;
-			} else {
-				curtask->tli[index].runtime[0] += delta_exec;
-				if (curtask->tli[index].runtime[0] > ohm_runtime_thresh_bg)
-					curtask->tli[index].tli_overload_flag |= TASK_CPU_OVERLOAD_BG_FLAG;
-			}
-		}
-#endif
+
 		trace_sched_stat_runtime(curtask, delta_exec, curr->vruntime);
 		cpuacct_charge(curtask, delta_exec);
 		account_group_exec_runtime(curtask, delta_exec);
-#ifdef CONFIG_ONEPLUS_HEALTHINFO
-		update_stuck_trace_info(curtask, STUCK_TRACE_RUNNING, cpu_of(rq_of(cfs_rq)), delta_exec);
-#endif
 	}
 
 	account_cfs_rq_runtime(cfs_rq, delta_exec);
@@ -1002,9 +945,6 @@ update_stats_wait_start(struct cfs_rq *cfs_rq, struct sched_entity *se)
 
 	schedstat_set(se->statistics.wait_start, wait_start);
 }
-#ifdef CONFIG_ONEPLUS_HEALTHINFO
-extern void ohm_schedstats_record(int sched_type, struct task_struct *task, u64 delta);
-#endif
 
 static inline void
 update_stats_wait_end(struct cfs_rq *cfs_rq, struct sched_entity *se)
@@ -1028,12 +968,6 @@ update_stats_wait_end(struct cfs_rq *cfs_rq, struct sched_entity *se)
 			schedstat_set(se->statistics.wait_start, delta);
 			return;
 		}
-#ifdef CONFIG_ONEPLUS_HEALTHINFO
-		ohm_schedstats_record(OHM_SCHED_SCHEDLATENCY, p, (delta >> 20));
-#endif
-#ifdef CONFIG_ONEPLUS_HEALTHINFO
-		update_stuck_trace_info(p, STUCK_TRACE_RUNNABLE, 0, delta);
-#endif
 		trace_sched_stat_wait(p, delta);
 	}
 
@@ -1074,9 +1008,6 @@ update_stats_enqueue_sleeper(struct cfs_rq *cfs_rq, struct sched_entity *se)
 		if (tsk) {
 			account_scheduler_latency(tsk, delta >> 10, 1);
 			trace_sched_stat_sleep(tsk, delta);
-#ifdef CONFIG_ONEPLUS_HEALTHINFO
-			update_stuck_trace_info(tsk, STUCK_TRACE_SSTATE, 0, delta);
-#endif
 		}
 	}
 	if (block_start) {
@@ -1096,19 +1027,7 @@ update_stats_enqueue_sleeper(struct cfs_rq *cfs_rq, struct sched_entity *se)
 				schedstat_add(se->statistics.iowait_sum, delta);
 				schedstat_inc(se->statistics.iowait_count);
 				trace_sched_stat_iowait(tsk, delta);
-#ifdef CONFIG_ONEPLUS_HEALTHINFO
-				ohm_schedstats_record(OHM_SCHED_IOWAIT, tsk,
-										(delta >> 20));
-#endif
 			}
-#ifdef CONFIG_ONEPLUS_HEALTHINFO
-			if (!tsk->in_iowait)
-				ohm_schedstats_record(OHM_SCHED_DSTATE, tsk, (delta >> 20));
-#endif
-
-#ifdef CONFIG_ONEPLUS_HEALTHINFO
-			update_stuck_trace_info(tsk, STUCK_TRACE_DSTATE, 0, delta);
-#endif
 
 			trace_sched_stat_blocked(tsk, delta);
 			trace_sched_blocked_reason(tsk);
@@ -4105,9 +4024,6 @@ enqueue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 {
 	bool renorm = !(flags & ENQUEUE_WAKEUP) || (flags & ENQUEUE_MIGRATED);
 	bool curr = cfs_rq->curr == se;
-#ifdef CONFIG_UXCHAIN
-	bool boost_flag = 0;
-#endif
 
 	/*
 	 * If we're the current task, we must renormalise before calling
@@ -4127,26 +4043,6 @@ enqueue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 	if (renorm && !curr)
 		se->vruntime += cfs_rq->min_vruntime;
 
-#ifdef CONFIG_UXCHAIN
-	if (entity_is_task(se) && sysctl_uxchain_enabled) {
-		struct task_struct *tsk = task_of(se);
-
-		if (is_opc_task(tsk, UT_FORE) && !tsk->dynamic_ux)
-			tsk->dynamic_ux = 1;
-
-		if (tsk->static_ux || tsk->dynamic_ux) {
-			u64 raw_vruntime;
-
-			raw_vruntime = se->vruntime;
-			se->vruntime = cfs_rq->min_vruntime -
-				(sysctl_sched_wakeup_granularity << 3);
-			if (raw_vruntime > se->vruntime)
-				se->vruntime_minus = raw_vruntime - se->vruntime;
-			boost_flag = 1;
-		}
-	}
-#endif
-
 	/*
 	 * When enqueuing a sched_entity, we must:
 	 *   - Update loads to have both entity and cfs_rq synced with now.
@@ -4160,13 +4056,8 @@ enqueue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 	update_cfs_shares(se);
 	account_entity_enqueue(cfs_rq, se);
 
-#ifdef CONFIG_UXCHAIN
-	if (flags & ENQUEUE_WAKEUP && !boost_flag)
-		place_entity(cfs_rq, se, 0);
-#else
 	if (flags & ENQUEUE_WAKEUP)
 		place_entity(cfs_rq, se, 0);
-#endif
 
 	check_schedstat_required();
 	update_stats_enqueue(cfs_rq, se, flags);
@@ -4256,20 +4147,6 @@ dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 	se->on_rq = 0;
 	account_entity_dequeue(cfs_rq, se);
 
-#ifdef CONFIG_UXCHAIN
-	if (entity_is_task(se) && sysctl_uxchain_enabled) {
-		struct task_struct *tsk = task_of(se);
-
-		if ((tsk->static_ux || tsk->dynamic_ux) &&
-			se->vruntime_minus > 0){
-			se->vruntime += se->vruntime_minus;
-			se->vruntime_minus = 0;
-		}
-		if (is_opc_task(tsk, UT_FORE) && tsk->dynamic_ux)
-			tsk->dynamic_ux = 0;
-	}
-#endif
-
 	/*
 	 * Normalize after update_curr(); which will also have moved
 	 * min_vruntime if @se is the one holding it back. But before doing
@@ -4303,18 +4180,6 @@ check_preempt_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 	unsigned long ideal_runtime, delta_exec;
 	struct sched_entity *se;
 	s64 delta;
-
-#ifdef CONFIG_UXCHAIN
-	if (entity_is_task(curr) && sysctl_uxchain_enabled) {
-		struct task_struct *tsk = task_of(curr);
-		u64 wallclock = sched_ktime_clock();
-
-		if ((tsk->static_ux || tsk->dynamic_ux) &&
-			(sysctl_launcher_boost_enabled ||
-			wallclock - tsk->oncpu_time < PREEMPT_DISABLE_NS))
-			return;
-	}
-#endif
 
 	ideal_runtime = sched_slice(cfs_rq, curr);
 	delta_exec = curr->sum_exec_runtime - curr->prev_sum_exec_runtime;
@@ -5406,8 +5271,6 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	struct sched_entity *se = &p->se;
 	int task_new = !(flags & ENQUEUE_WAKEUP);
 
-	opc_task_switch(true, cpu_of(rq), p, 0);
-
 #ifdef CONFIG_SCHED_WALT
 	p->misfit = !task_fits_max(p, rq->cpu);
 #endif
@@ -5499,8 +5362,6 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	struct cfs_rq *cfs_rq;
 	struct sched_entity *se = &p->se;
 	int task_sleep = flags & DEQUEUE_SLEEP;
-
-	opc_task_switch(false, cpu_of(rq), p, rq->clock);
 
 	/*
 	 * The code below (indirectly) updates schedutil which looks at
@@ -7555,45 +7416,7 @@ static inline void adjust_cpus_for_packing(struct task_struct *p,
 static int get_start_cpu(struct task_struct *p)
 {
 	struct root_domain *rd = cpu_rq(smp_processor_id())->rd;
-	int start_cpu = rd->min_cap_orig_cpu;
-	int task_boost = per_task_boost(p);
-	bool boosted = schedtune_task_boost(p) > 0 ||
-			task_boost_policy(p) == SCHED_BOOST_ON_BIG ||
-			task_boost == TASK_BOOST_ON_MID;
-	bool task_skip_min = (sched_boost() != CONSERVATIVE_BOOST)
-				&& get_rtg_status(p) && p->unfilter;
-	bool is_uxtop = is_opc_task(p, UT_FORE);
-
-#if defined(CONFIG_OPCHAIN) && defined(CONFIG_HOUSTON)
-	if (is_uxtop && current->ravg.demand_scaled >= p->ravg.demand_scaled) {
-		ht_rtg_list_add_tail(current);
-	}
-#endif
-
-	if (is_uxtop && task_sched_boost(p)) {
-		if (rd->mid_cap_orig_cpu != -1
-			&& task_fits_max(p, rd->mid_cap_orig_cpu))
-			return rd->mid_cap_orig_cpu;
-
-		return rd->max_cap_orig_cpu;
-	}
-
-#if defined(CONFIG_CONTROL_CENTER) && defined(CONFIG_IM)
-	if ((im_rendering(p)) &&
-			im_render_grouping_enable() &&
-			ccdm_get_hint(CCDM_TB_PLACE_BOOST) &&
-			task_util(p) > ccdm_get_min_util_threshold()) {
-		start_cpu = rd->mid_cap_orig_cpu == -1 ?
-			rd->max_cap_orig_cpu : rd->mid_cap_orig_cpu;
-		return start_cpu;
-	}
-#endif
-
-#ifdef CONFIG_ONEPLUS_FG_OPT
-	if (ht_fuse_boost && p->fuse_boost)
-		return rd->mid_cap_orig_cpu == -1 ?
-			rd->max_cap_orig_cpu : rd->mid_cap_orig_cpu;
-#endif
+	int start_cpu = -1;
 
 	/*
 	 * note about min/mid/max_cap_orig_cpu - either all of them will be -ve
@@ -7718,20 +7541,6 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 			if (!cpu_online(i) || cpu_isolated(i))
 				continue;
 
-#ifdef CONFIG_UXCHAIN
-			if (current->static_ux == 1 &&
-				current->group_leader == current && sysctl_uxchain_enabled &&
-				sysctl_launcher_boost_enabled && i == smp_processor_id())
-				continue;
-
-			if (sysctl_uxchain_enabled && ux_thread(p)) {
-				struct rq *rq = cpu_rq(i);
-				struct task_struct *tsk = rq->curr;
-
-				if (ux_thread(tsk) || tsk->normal_prio <= 100)
-					continue;
-			}
-#endif
 			if (isolated_candidate == -1)
 				isolated_candidate = i;
 			/*
@@ -7753,9 +7562,7 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 			 * so prev_cpu will receive a negative bias due to the double
 			 * accounting. However, the blocked utilization may be zero.
 			 */
-
 			wake_util = cpu_util_without(i, p);
-
 			new_util = wake_util + task_util_est(p);
 			spare_wake_cap = capacity_orig - wake_util;
 
@@ -8110,24 +7917,6 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 	    cpu_isolated(prev_cpu))
 		target_cpu = isolated_candidate;
 
-#ifdef CONFIG_UXCHAIN
-	if (sysctl_uxchain_enabled && ux_thread(p) && target_cpu == -1) {
-		sg = sd->groups;
-		do {
-			for_each_cpu_and(i, &p->cpus_allowed, sched_group_span(sg)) {
-				struct rq *rq = cpu_rq(i);
-				struct task_struct *tsk = rq->curr;
-
-				if (!ux_thread(tsk) && tsk->normal_prio > 100) {
-					target_cpu = i;
-					break;
-				}
-			}
-			if (target_cpu != -1)
-				break;
-		} while (sg = sg->next, sg != sd->groups);
-	}
-#endif
 out:
 	return target_cpu;
 }
@@ -8354,32 +8143,10 @@ static int find_energy_efficient_cpu(struct sched_domain *sd,
 	int placement_boost = task_boost_policy(p);
 	u64 start_t = 0;
 	int next_cpu = -1, backup_cpu = -1;
-	int task_boost = per_task_boost(p);
-	int boosted = (schedtune_task_boost(p) > 0) || (task_boost > 0);
-	bool is_uxtop = is_opc_task(p, UT_FORE);
-	int start_cpu;
-
-	if (is_many_wakeup(sibling_count_hint) && prev_cpu != cpu &&
-			cpumask_test_cpu(prev_cpu, &p->cpus_allowed))
-		return prev_cpu;
-
-	start_cpu = get_start_cpu(p);
-	if (start_cpu < 0)
-		return -1;
-
-	is_rtg = task_in_related_thread_group(p);
-	curr_is_rtg = task_in_related_thread_group(cpu_rq(cpu)->curr);
+	int boosted = (schedtune_task_boost(p) > 0 || per_task_boost(p) > 0);
 
 	fbt_env.fastpath = 0;
 	fbt_env.need_idle = need_idle;
-
-#ifdef CONFIG_UXCHAIN
-	if (p->static_ux == 1 && p->group_leader == p &&
-		sysctl_uxchain_enabled && sysctl_launcher_boost_enabled) {
-		if (cpu_online(GOLD_PLUS_CPU) && !cpu_isolated(GOLD_PLUS_CPU))
-			return GOLD_PLUS_CPU;
-	}
-#endif
 
 	if (trace_sched_task_util_enabled())
 		start_t = sched_clock();
@@ -8388,8 +8155,7 @@ static int find_energy_efficient_cpu(struct sched_domain *sd,
 		sync = 0;
 
 	if (sysctl_sched_sync_hint_enable && sync &&
-				bias_to_this_cpu(p, cpu, start_cpu) &&
-				opc_check_uxtop_cpu(is_uxtop, cpu)) {
+				bias_to_this_cpu(p, cpu, rtg_target)) {
 		target_cpu = cpu;
 		fbt_env.fastpath = SYNC_WAKEUP;
 		goto out;
@@ -8468,9 +8234,10 @@ static int find_energy_efficient_cpu(struct sched_domain *sd,
 		if (p->state == TASK_WAKING)
 			delta = task_util(p);
 #endif
-
-		if (task_placement_boost_enabled(p) || fbt_env.need_idle || boosted ||
-		    is_rtg || __cpu_overutilized(prev_cpu, delta) || is_uxtop ||
+		if (task_placement_boost_enabled(p) || need_idle || boosted ||
+		    (rtg_target && (!cpumask_test_cpu(prev_cpu, rtg_target) ||
+		    cpumask_test_cpu(target_cpu, rtg_target))) ||
+		    __cpu_overutilized(prev_cpu, delta) ||
 		    !task_fits_max(p, prev_cpu) || cpu_isolated(prev_cpu))
 			goto out;
 
@@ -8503,9 +8270,9 @@ out:
 		target_cpu = prev_cpu;
 
 	trace_sched_task_util(p, next_cpu, backup_cpu, target_cpu, sync,
-			fbt_env.need_idle, fbt_env.fastpath, placement_boost,
-			start_t, is_uxtop, boosted, is_rtg, get_rtg_status(p),
-			start_cpu);
+			need_idle, fbt_env.fastpath, placement_boost,
+			rtg_target ? cpumask_first(rtg_target) : -1, start_t,
+			boosted);
 	return target_cpu;
 }
 
@@ -9244,8 +9011,6 @@ enum group_type {
 #define LBF_SOME_PINNED	0x08
 #define LBF_IGNORE_BIG_TASKS 0x100
 #define LBF_IGNORE_PREFERRED_CLUSTER_TASKS 0x200
-#define LBF_IGNORE_UX_TOP 0x800
-#define LBF_IGNORE_SLAVE 0xC00
 
 struct lb_env {
 	struct sched_domain	*sd;
@@ -9465,10 +9230,6 @@ int can_migrate_task(struct task_struct *p, struct lb_env *env)
 		!task_fits_max(p, env->dst_cpu))
 		return 0;
 #endif
-	if (env->flags & LBF_IGNORE_UX_TOP && is_opc_task(p, UT_FORE))
-		return 0;
-	if (env->flags & LBF_IGNORE_SLAVE && UTASK_SLAVE(p))
-		return 0;
 
 	if (task_running(env->src_rq, p)) {
 		schedstat_inc(p->se.statistics.nr_failed_migrations_running);
@@ -9566,8 +9327,6 @@ static int detach_tasks(struct lb_env *env)
 	unsigned long load = 0;
 	int detached = 0;
 	int orig_loop = env->loop;
-	int src_claim = opc_get_claim_on_cpu(env->src_cpu);
-	u64 start_t = rq_clock(env->src_rq);
 
 	lockdep_assert_held(&env->src_rq->lock);
 
@@ -9578,15 +9337,8 @@ static int detach_tasks(struct lb_env *env)
 		if (!same_cluster(env->dst_cpu, env->src_cpu))
 			env->flags |= LBF_IGNORE_PREFERRED_CLUSTER_TASKS;
 
-		if (capacity_orig_of(env->dst_cpu) <
-				capacity_orig_of(env->src_cpu)) {
-			env->flags |= LBF_IGNORE_BIG_TASKS;
-	}
-		if (src_claim == 1)
-			env->flags |= LBF_IGNORE_UX_TOP | LBF_IGNORE_SLAVE;
-		else if (src_claim == -1)
-			env->flags |= LBF_IGNORE_SLAVE;
-	}
+	if (cpu_capacity(env->dst_cpu) < cpu_capacity(env->src_cpu))
+		env->flags |= LBF_IGNORE_BIG_TASKS;
 
 redo:
 	while (!list_empty(tasks)) {
@@ -9685,9 +9437,6 @@ next:
 		tasks = &env->src_rq->cfs_tasks;
 		env->flags &= ~(LBF_IGNORE_BIG_TASKS |
 				LBF_IGNORE_PREFERRED_CLUSTER_TASKS);
-		if (env->flags & LBF_IGNORE_SLAVE)
-			env->flags &= ~LBF_IGNORE_SLAVE;
-
 		env->loop = orig_loop;
 		goto redo;
 	}
@@ -9997,10 +9746,6 @@ static void update_cpu_capacity(struct sched_domain *sd, int cpu)
 {
 	unsigned long capacity = arch_scale_cpu_capacity(sd, cpu);
 	struct sched_group *sdg = sd->groups;
-	struct max_cpu_capacity *mcc;
-	unsigned long max_capacity;
-	int max_cap_cpu;
-	unsigned long flags;
 
 	capacity *= arch_scale_max_freq_capacity(sd, cpu);
 	capacity >>= SCHED_CAPACITY_SHIFT;
@@ -10008,25 +9753,6 @@ static void update_cpu_capacity(struct sched_domain *sd, int cpu)
 	capacity = min(capacity, thermal_cap(cpu));
 	cpu_rq(cpu)->cpu_capacity_orig = capacity;
 
-	mcc = &cpu_rq(cpu)->rd->max_cpu_capacity;
-
-	raw_spin_lock_irqsave(&mcc->lock, flags);
-	max_capacity = mcc->val;
-	max_cap_cpu = mcc->cpu;
-
-	if ((max_capacity > capacity && max_cap_cpu == cpu) ||
-	    max_capacity < capacity) {
-		mcc->val = capacity;
-		mcc->cpu = cpu;
-#ifdef CONFIG_SCHED_DEBUG
-		raw_spin_unlock_irqrestore(&mcc->lock, flags);
-
-		goto skip_unlock;
-#endif
-	}
-	raw_spin_unlock_irqrestore(&mcc->lock, flags);
-
-skip_unlock: __attribute__ ((unused));
 	capacity *= scale_rt_capacity(cpu);
 	capacity >>= SCHED_CAPACITY_SHIFT;
 

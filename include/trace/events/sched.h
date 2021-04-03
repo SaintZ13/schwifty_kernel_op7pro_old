@@ -1470,14 +1470,12 @@ TRACE_EVENT(sched_energy_diff,
 TRACE_EVENT(sched_task_util,
 
 	TP_PROTO(struct task_struct *p, int next_cpu, int backup_cpu,
-		int target_cpu, bool sync, int need_idle, int fastpath,
-		bool placement_boost, bool ux_task, u64 start_t,
-		bool stune_boosted, bool is_rtg, bool rtg_skip_min,
-		int start_cpu),
+		int target_cpu, bool sync, bool need_idle, int fastpath,
+		bool placement_boost, int rtg_cpu, u64 start_t,
+		bool stune_boosted),
 
 	TP_ARGS(p, next_cpu, backup_cpu, target_cpu, sync, need_idle, fastpath,
-		placement_boost, ux_task, start_t, stune_boosted, is_rtg, rtg_skip_min,
-		start_cpu),
+		placement_boost, rtg_cpu, start_t, stune_boosted),
 
 	TP_STRUCT__entry(
 		__field(int, pid			)
@@ -1493,7 +1491,6 @@ TRACE_EVENT(sched_task_util,
 		__field(int, placement_boost		)
 		__field(int, rtg_cpu			)
 		__field(u64, latency			)
-		__field(bool, ux_task			)
 		__field(bool, stune_boosted		)
 		__field(bool, is_rtg			)
 		__field(bool, rtg_skip_min		)
@@ -1516,7 +1513,6 @@ TRACE_EVENT(sched_task_util,
 		__entry->fastpath		= fastpath;
 		__entry->placement_boost	= placement_boost;
 		__entry->latency		= (sched_clock() - start_t);
-		__entry->ux_task		= ux_task;
 		__entry->stune_boosted		= stune_boosted;
 		__entry->is_rtg			= is_rtg;
 		__entry->rtg_skip_min		= rtg_skip_min;
@@ -1526,13 +1522,12 @@ TRACE_EVENT(sched_task_util,
 		__entry->low_latency		= walt_low_latency_task(p);;
 	),
 
-	TP_printk("pid=%d comm=%s util=%lu prev_cpu=%d next_cpu=%d backup_cpu=%d target_cpu=%d sync=%d need_idle=%d fastpath=%d placement_boost=%d latency=%llu uxtop=%d stune_boosted=%d is_rtg=%d rtg_skip_min=%d start_cpu=%d unfilter=%u affine=%#lx low_latency=%d",
+	TP_printk("pid=%d comm=%s util=%lu prev_cpu=%d next_cpu=%d backup_cpu=%d target_cpu=%d sync=%d need_idle=%d fastpath=%d placement_boost=%d rtg_cpu=%d latency=%llu stune_boosted=%d",
+		__entry->pid, __entry->comm, __entry->util, __entry->prev_cpu,
 		__entry->next_cpu, __entry->backup_cpu, __entry->target_cpu,
-		__entry->sync, __entry->need_idle,
-		__entry->fastpath, __entry->placement_boost,
-		__entry->latency, __entry->stune_boosted, __entry->ux_task,
-		__entry->is_rtg, __entry->rtg_skip_min, __entry->start_cpu,
-		__entry->unfilter, __entry->cpus_allowed, __entry->low_latency)
+		__entry->sync, __entry->need_idle, __entry->fastpath,
+		__entry->placement_boost, __entry->rtg_cpu, __entry->latency,
+		__entry->stune_boosted)
 )
 
 /*

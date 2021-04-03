@@ -35,7 +35,6 @@
 #include <linux/of_device.h>
 #include <soc/qcom/scm.h>
 
-#include <oneplus/houston/houston_helper.h>
 enum ev_index {
 	INST_IDX,
 	CM_IDX,
@@ -125,7 +124,6 @@ static void read_perf_counters(int cpu, struct cpu_grp_info *cpu_grp)
 	} else {
 		devstats->stall_pct = 100;
 	}
-	ht_update_hw_events(devstats->inst_count, devstats->mem_count, cyc_cnt);
 }
 
 static unsigned long get_cnt(struct memlat_hwmon *hw)
