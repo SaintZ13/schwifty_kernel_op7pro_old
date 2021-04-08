@@ -6160,6 +6160,31 @@ static void fg_gen4_post_init(struct fg_gen4_chip *chip)
 
 	fg_dbg(fg, FG_STATUS, "Disabled wakeable irqs for debug board\n");
 }
+static void oem_update_cc_cv_setpoint(
+				struct fg_dev *chip, int cv_float_point)
+{
+	/* TODO: write CC_CV_SETPOINT_REG */
+}
+
+static void oneplus_set_allow_read_iic(struct fg_dev *chip,
+				bool status)
+{
+	if (chip->use_external_fg && external_fg
+			&& external_fg->set_allow_reading)
+		external_fg->set_allow_reading(status);
+	else
+		pr_info("set allow read extern fg iic fail\n");
+}
+
+static void oneplus_set_lcd_off_status(struct fg_dev *chip,
+				bool status)
+{
+	if (chip->use_external_fg && external_fg
+			&& external_fg->set_lcd_off_status)
+		external_fg->set_lcd_off_status(status);
+	else
+		pr_info("set lcd off status fail\n");
+}
 
 /* @bsp, 2019/04/17 Battery & Charging porting */
 static void oem_update_cc_cv_setpoint(
