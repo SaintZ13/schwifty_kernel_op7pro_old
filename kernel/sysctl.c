@@ -136,9 +136,24 @@ static unsigned long one_ul = 1;
 static unsigned long long_max = LONG_MAX;
 static int one_hundred = 100;
 static int one_thousand = 1000;
+<<<<<<< HEAD
+#ifdef CONFIG_DIRECT_SWAPPINESS
+static int two_hundred = 200;
+#endif
+
+static int max_swappiness = 200;
+
+unsigned int sysctl_fg_io_opt = 1;
+
+unsigned int sysctl_ext4_fsync_enable = 1;
+unsigned int ext4_fsync_enable_status;
+unsigned long sysctl_blkdev_issue_flush_count;
+
+=======
 #ifdef CONFIG_SCHED_WALT
 static int two_million = 2000000;
 #endif
+>>>>>>> a105ec08ca6c... treewide/oneplus: massive code removal
 #ifdef CONFIG_PRINTK
 static int ten_thousand = 10000;
 #endif
@@ -1705,7 +1720,41 @@ static struct ctl_table vm_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &zero,
+<<<<<<< HEAD
+#ifdef CONFIG_DIRECT_SWAPPINESS
+		.extra2		= &two_hundred,
+#else
+		.extra2		= &max_swappiness,
+#endif
+	},
+#ifdef CONFIG_DIRECT_SWAPPINESS
+	{
+		.procname	= "direct_swappiness",
+		.data		= &vm_direct_swapiness,
+		.maxlen		= sizeof(vm_direct_swapiness),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &two_hundred,
+	},
+#endif
+	{
+		.procname	= "breath_period",
+		.data		= &vm_breath_period,
+		.maxlen		= sizeof(vm_breath_period),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+	},
+	{
+		.procname	= "breath_priority",
+		.data		= &vm_breath_priority,
+		.maxlen		= sizeof(vm_breath_priority),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+=======
 		.extra2		= &one_hundred,
+>>>>>>> a105ec08ca6c... treewide/oneplus: massive code removal
 	},
 	{
 		.procname       = "want_old_faultaround_pte",
