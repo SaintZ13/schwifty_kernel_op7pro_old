@@ -53,6 +53,9 @@
 #endif /* CONFIG_COMMON_CLK */
 #define CREATE_TRACE_POINTS
 #include <trace/events/trace_msm_low_power.h>
+#ifdef CONFIG_CONTROL_CENTER
+#include <oneplus/control_center/control_center_helper.h>
+#endif
 
 #define SCLK_HZ (32768)
 #define PSCI_POWER_STATE(reset) (reset << 30)
@@ -108,6 +111,12 @@ module_param_named(print_parsed_dt, print_parsed_dt, bool, 0664);
 
 static bool sleep_disabled;
 module_param_named(sleep_disabled, sleep_disabled, bool, 0664);
+
+void msm_cpuidle_set_sleep_disable(bool disable)
+{
+	sleep_disabled = disable;
+	pr_info("%s:sleep_disabled=%d\n", __func__, disable);
+}
 
 /**
  * msm_cpuidle_get_deep_idle_latency - Get deep idle latency value
@@ -601,23 +610,44 @@ static void clear_predict_history(void)
 
 static void update_history(struct cpuidle_device *dev, int idx);
 
-static inline bool is_cpu_biased(int cpu, uint64_t *bias_time)
+#ifdef CONFIG_CONTROL_CENTER
+static inline bool lpm_disallowed(s64 sleep_us, int cpu, struct lpm_cpu *pm_cpu)
 {
-	u64 now = sched_clock();
-	u64 last = sched_get_cpu_last_busy_time(cpu);
-	u64 diff = 0;
+	uint64_t bias_time = 0;
 
-	if (!last)
-		return false;
+#ifdef CONFIG_CONTROL_CENTER
+	uint64_t tb_block_ts;
+	int tb_ccdm_idx = cpu + CCDM_TB_CPU_0_IDLE_BLOCK;
+#endif
 
-	diff = now - last;
-	if (diff < BIAS_HYST) {
-		*bias_time = BIAS_HYST - diff;
+	if (cpu_isolated(cpu))
+		goto out;
+
+	if (sleep_disabled)
+		return true;
+
+	bias_time = sched_lpm_disallowed_time(cpu);
+	if (bias_time) {
+		pm_cpu->bias = bias_time;
 		return true;
 	}
 
+#ifdef CONFIG_CONTROL_CENTER
+	tb_block_ts = ccdm_get_hint(tb_ccdm_idx);
+	if (!time_after64(get_jiffies_64(), tb_block_ts))
+		return true;
+#endif
+
+out:
+#ifdef CONFIG_CONTROL_CENTER
+	ccdm_update_hint_1(tb_ccdm_idx, ULLONG_MAX);
+#endif
+	if (sleep_us < 0)
+		return true;
+
 	return false;
 }
+#endif
 
 static int cpu_power_select(struct cpuidle_device *dev,
 		struct lpm_cpu *cpu)
@@ -637,11 +667,15 @@ static int cpu_power_select(struct cpuidle_device *dev,
 	uint32_t min_residency, max_residency;
 	struct power_params *pwr_params;
 
-	if ((sleep_disabled && !cpu_isolated(dev->cpu)) || sleep_us < 0)
-		return best_level;
+#ifdef CONFIG_CONTROL_CENTER
+	if (lpm_disallowed(sleep_us, dev->cpu, cpu))
+		goto done_select;
+#else
+	if (lpm_disallowed(sleep_us, dev->cpu, cpu))
+		goto done_select;
+#endif
 
 	idx_restrict = cpu->nlevels + 1;
-
 	next_event_us = (uint32_t)(ktime_to_us(get_next_event_time(dev->cpu)));
 
 	for (i = 0; i < cpu->nlevels; i++) {

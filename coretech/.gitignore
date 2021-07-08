@@ -2,7 +2,10 @@ uxcore/*
 !uxcore/opchain_helper.c
 !uxcore/opchain_helper.h
 !uxcore/opchain_define.h
+<<<<<<< HEAD
 !uxcore/Makefile
+=======
+>>>>>>> parent of f0a33da52d93... treewide/oneplus: massive code removal
 memplus/*
 !memplus/memplus_helper.c
 !memplus/memplus_helper.h

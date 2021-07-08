@@ -29,6 +29,9 @@
 #include "walt.h"
 
 #include <trace/events/sched.h>
+#ifdef CONFIG_IM
+#include <linux/oem/im.h>
+#endif
 
 const char *task_event_names[] = {"PUT_PREV_TASK", "PICK_NEXT_TASK",
 				  "TASK_WAKE", "TASK_MIGRATE", "TASK_UPDATE",
@@ -1895,6 +1898,11 @@ done:
 
 static u64 add_to_task_demand(struct rq *rq, struct task_struct *p, u64 delta)
 {
+	if (p->compensate_need == 1) {
+		delta += p->compensate_time;
+		p->compensate_time = 0;
+		p->compensate_need = 0;
+	}
 	delta = scale_exec_time(delta, rq);
 	p->ravg.sum += delta;
 	if (unlikely(p->ravg.sum > sched_ravg_window))
@@ -2335,6 +2343,14 @@ static struct sched_cluster *alloc_new_cluster(const struct cpumask *cpus)
 	raw_spin_lock_init(&cluster->load_lock);
 	cluster->cpus = *cpus;
 	cluster->efficiency = topology_get_cpu_efficiency(cpumask_first(cpus));
+#ifdef CONFIG_ONEPLUS_HEALTHINFO
+	// 2020-05-01,Add for cpu overload statistic
+	cluster->overload = kzalloc(sizeof(struct sched_stat_para), GFP_ATOMIC);
+	cluster->overload->low_thresh_ms = 100;
+	cluster->overload->high_thresh_ms = 500;
+	if (!cluster->overload)
+		return NULL;
+#endif
 
 	if (cluster->efficiency > max_possible_efficiency)
 		max_possible_efficiency = cluster->efficiency;
@@ -2816,7 +2832,7 @@ int update_preferred_cluster(struct related_thread_group *grp,
 {
 	u32 new_load = task_load(p);
 
-	if (!grp)
+	if (!grp || !p->grp)
 		return 0;
 
 	if (unlikely(from_tick && is_suh_max()))
@@ -2835,8 +2851,6 @@ int update_preferred_cluster(struct related_thread_group *grp,
 
 #define ADD_TASK	0
 #define REM_TASK	1
-
-#define DEFAULT_CGROUP_COLOC_ID 1
 
 static inline struct related_thread_group*
 lookup_related_thread_group(unsigned int group_id)
@@ -2943,6 +2957,14 @@ void add_new_task_to_grp(struct task_struct *new)
 	unsigned long flags;
 	struct related_thread_group *grp;
 
+#ifdef CONFIG_IM
+	if (im_sf(new)) {
+		// add child of sf into rdg
+		if (!im_render_grouping_enable())
+			im_list_add_task(new);
+	}
+#endif
+
 	/*
 	 * If the task does not belong to colocated schedtune
 	 * cgroup, nothing to do. We are checking this without
@@ -3013,7 +3035,10 @@ int sched_set_group_id(struct task_struct *p, unsigned int group_id)
 {
 	/* DEFAULT_CGROUP_COLOC_ID is a reserved id */
 	if (group_id == DEFAULT_CGROUP_COLOC_ID)
-		return -EINVAL;
+#ifdef CONFIG_IM
+		if (!im_rendering(p))
+#endif
+			return -EINVAL;
 
 	return __sched_set_group_id(p, group_id);
 }
@@ -3061,6 +3086,12 @@ late_initcall(create_default_coloc_group);
 int sync_cgroup_colocation(struct task_struct *p, bool insert)
 {
 	unsigned int grp_id = insert ? DEFAULT_CGROUP_COLOC_ID : 0;
+#ifdef CONFIG_IM
+		if (im_sf(p)) {
+			// bypass surfaceflinger to be group 0
+			return 0;
+		}
+#endif
 
 	return __sched_set_group_id(p, grp_id);
 }
@@ -3669,3 +3700,250 @@ void walt_sched_init_rq(struct rq *rq)
 	rq->cum_window_demand_scaled = 0;
 	rq->notif_pending = false;
 }
+
+int walt_proc_user_hint_handler(struct ctl_table *table,
+				int write, void __user *buffer, size_t *lenp,
+				loff_t *ppos)
+{
+	int ret;
+	unsigned int old_value;
+	static DEFINE_MUTEX(mutex);
+
+	mutex_lock(&mutex);
+
+	sched_user_hint_reset_time = jiffies + HZ;
+	old_value = sysctl_sched_user_hint;
+	ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
+	if (ret || !write || (old_value == sysctl_sched_user_hint))
+		goto unlock;
+
+	irq_work_queue(&walt_migration_irq_work);
+
+unlock:
+	mutex_unlock(&mutex);
+	return ret;
+}
+
+static inline void sched_window_nr_ticks_change(void)
+{
+	int new_ticks;
+	unsigned long flags;
+
+	spin_lock_irqsave(&sched_ravg_window_lock, flags);
+
+	new_ticks = min(display_sched_ravg_window_nr_ticks,
+			sysctl_sched_ravg_window_nr_ticks);
+
+	new_sched_ravg_window = new_ticks * (NSEC_PER_SEC / HZ);
+	spin_unlock_irqrestore(&sched_ravg_window_lock, flags);
+}
+
+int sched_ravg_window_handler(struct ctl_table *table,
+				int write, void __user *buffer, size_t *lenp,
+				loff_t *ppos)
+{
+	int ret = -EPERM;
+	static DEFINE_MUTEX(mutex);
+	unsigned int prev_value;
+
+	mutex_lock(&mutex);
+
+	if (write && (HZ != 250 || !sysctl_sched_dynamic_ravg_window_enable))
+		goto unlock;
+
+	prev_value = sysctl_sched_ravg_window_nr_ticks;
+	ret = proc_douintvec_ravg_window(table, write, buffer, lenp, ppos);
+	if (ret || !write || (prev_value == sysctl_sched_ravg_window_nr_ticks))
+		goto unlock;
+
+	sched_window_nr_ticks_change();
+
+unlock:
+	mutex_unlock(&mutex);
+	return ret;
+}
+
+extern u32 mode_fps;
+
+void sched_set_refresh_rate(void)
+{
+	if (HZ == 250 && sysctl_sched_dynamic_ravg_window_enable) {
+		if (mode_fps == 90)
+		{
+			pr_err("[WALT] set 90fps WALT RAVG_Window\n");
+			display_sched_ravg_window_nr_ticks = 3;
+		}
+		else if (mode_fps == 60)
+		{
+			pr_err("[WALT] set 60fps WALT RAVG_Window\n");
+			display_sched_ravg_window_nr_ticks = 5;
+		}
+		sched_window_nr_ticks_change();
+	}
+}
+
+
+/* Migration margins */
+unsigned int sysctl_sched_capacity_margin_up[MAX_MARGIN_LEVELS] = {
+			[0 ... MAX_MARGIN_LEVELS-1] = 1078}; /* ~5% margin */
+unsigned int sysctl_sched_capacity_margin_down[MAX_MARGIN_LEVELS] = {
+			[0 ... MAX_MARGIN_LEVELS-1] = 1205}; /* ~15% margin */
+
+#ifdef CONFIG_PROC_SYSCTL
+static void sched_update_updown_migrate_values(bool up)
+{
+	int i = 0, cpu;
+	struct sched_cluster *cluster;
+	int cap_margin_levels = num_sched_clusters - 1;
+
+	if (cap_margin_levels > 1) {
+		/*
+		 * No need to worry about CPUs in last cluster
+		 * if there are more than 2 clusters in the system
+		 */
+		for_each_sched_cluster(cluster) {
+			for_each_cpu(cpu, &cluster->cpus) {
+
+				if (up)
+					sched_capacity_margin_up[cpu] =
+					sysctl_sched_capacity_margin_up[i];
+				else
+					sched_capacity_margin_down[cpu] =
+					sysctl_sched_capacity_margin_down[i];
+			}
+
+			if (++i >= cap_margin_levels)
+				break;
+		}
+	} else {
+		for_each_possible_cpu(cpu) {
+			if (up)
+				sched_capacity_margin_up[cpu] =
+					sysctl_sched_capacity_margin_up[0];
+			else
+				sched_capacity_margin_down[cpu] =
+					sysctl_sched_capacity_margin_down[0];
+		}
+	}
+}
+
+int sched_updown_migrate_handler(struct ctl_table *table, int write,
+				void __user *buffer, size_t *lenp,
+				loff_t *ppos)
+{
+	int ret, i;
+	unsigned int *data = (unsigned int *)table->data;
+	unsigned int *old_val;
+	static DEFINE_MUTEX(mutex);
+	int cap_margin_levels = num_sched_clusters ? num_sched_clusters - 1 : 0;
+
+	if (cap_margin_levels <= 0)
+		return -EINVAL;
+
+	mutex_lock(&mutex);
+
+	if (table->maxlen != (sizeof(unsigned int) * cap_margin_levels))
+		table->maxlen = sizeof(unsigned int) * cap_margin_levels;
+
+	if (!write) {
+		ret = proc_douintvec_capacity(table, write, buffer, lenp, ppos);
+		goto unlock_mutex;
+	}
+
+	/*
+	 * Cache the old values so that they can be restored
+	 * if either the write fails (for example out of range values)
+	 * or the downmigrate and upmigrate are not in sync.
+	 */
+	old_val = kmemdup(data, table->maxlen, GFP_KERNEL);
+	if (!old_val) {
+		ret = -ENOMEM;
+		goto unlock_mutex;
+	}
+
+	ret = proc_douintvec_capacity(table, write, buffer, lenp, ppos);
+
+	if (ret) {
+		memcpy(data, old_val, table->maxlen);
+		goto free_old_val;
+	}
+
+	for (i = 0; i < cap_margin_levels; i++) {
+		if (sysctl_sched_capacity_margin_up[i] >
+				sysctl_sched_capacity_margin_down[i]) {
+			memcpy(data, old_val, table->maxlen);
+			ret = -EINVAL;
+			goto free_old_val;
+		}
+	}
+
+	sched_update_updown_migrate_values(data ==
+					&sysctl_sched_capacity_margin_up[0]);
+
+free_old_val:
+	kfree(old_val);
+unlock_mutex:
+	mutex_unlock(&mutex);
+
+	return ret;
+}
+#endif
+
+#ifdef CONFIG_IM
+int group_show(struct seq_file *m, void *v)
+{
+	struct related_thread_group *grp;
+	unsigned long flags;
+	struct task_struct *p;
+	u64 total_demand = 0;
+	u64 render_demand = 0;
+
+	if (!im_render_grouping_enable())
+		return 0;
+
+	grp = lookup_related_thread_group(DEFAULT_CGROUP_COLOC_ID);
+
+	raw_spin_lock_irqsave(&grp->lock, flags);
+	if (list_empty(&grp->tasks)) {
+		raw_spin_unlock_irqrestore(&grp->lock, flags);
+		return 0;
+	}
+
+	list_for_each_entry(p, &grp->tasks, grp_list) {
+
+		total_demand += p->ravg.demand_scaled;
+
+		if (!im_rendering(p))
+			continue;
+
+		seq_printf(m, "%u, %lu, %d\n", p->pid, p->ravg.demand_scaled, p->cpu);
+		render_demand += p->ravg.demand_scaled;
+	}
+
+	seq_printf(m, "total: %u / render: %u\n", total_demand, render_demand);
+
+	raw_spin_unlock_irqrestore(&grp->lock, flags);
+	return 0;
+}
+
+void group_remove(void)
+{
+	struct related_thread_group *grp;
+	struct task_struct *p, *next;
+
+	if (!im_render_grouping_enable())
+		return;
+
+	grp = lookup_related_thread_group(DEFAULT_CGROUP_COLOC_ID);
+
+	if (list_empty(&grp->tasks))
+		return;
+
+	list_for_each_entry_safe(p, next, &grp->tasks, grp_list) {
+		if (im_sf(p))
+			sched_set_group_id(p, 0);
+	}
+}
+
+#endif
+
