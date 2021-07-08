@@ -411,7 +411,6 @@ static inline int current_is_fg(void)
 	return 0;
 }
 
-#ifdef CONFIG_ONEPLUS_FG_OPT
 extern bool is_fg(int uid);
 static inline int task_is_fg(struct task_struct *task)
 {	int cur_uid;
